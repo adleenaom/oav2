@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  api:
+    build: ./api
+    ports:
+      - "8000:8000"
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-openacademy-change-this-in-production}
+      - DATABASE_URL=sqlite:///./data/openacademy.db
+    volumes:
+      - api-data:/app/data
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ./app
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  api-data:

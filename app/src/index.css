@@ -1,0 +1,596 @@
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================
+   PRIMITIVES — raw design values
+   ============================================ */
+:root {
+  /* Color Primitives */
+  --color-white: #FFFFFF;
+  --color-dark-gray: #202020;
+  --color-gray-1: #6D727A;
+  --color-gray-2: #A2AAB7;
+  --color-gray-3: #BFC8D4;
+  --color-gray-4: #CED3D9;
+  --color-light-gray: #F4F6F9;
+  --color-action-blue: #5496F7;
+  --color-orange: #F2994A;
+  --color-brand-oa-blue: #67C8FF;
+  --color-brand-oa-blue-text: #18485C;
+  --color-brand-oa-magenta: #EB5579;
+  --color-brand-oa-green: #A6C311;
+  --color-brand-oa-yellow: #FFCD4B;
+  --color-day-image-primary: #D7D7D8;
+  --color-label-light-primary: #000000;
+
+  /* Spacing Primitives — component-level */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Spacing Primitives — section-level */
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+  --space-32: 128px;
+
+  /* Layout Primitives */
+  --max-w-content: 1120px;
+  --max-w-narrow: 720px;
+  --max-w-wide: 1280px;
+  --nav-height: 64px;
+
+  /* Effect Primitives */
+  --shadow-button: 0 4px 24px rgba(0, 0, 0, 0.12);
+  --shadow-nav: 0px -4px 14px rgba(0, 0, 0, 0.05);
+
+  /* Focus ring */
+  --focus-ring: 0 0 0 2px var(--color-white), 0 0 0 4px var(--color-action-blue);
+
+  /* Font Primitives */
+  --font-sans: 'Montserrat', system-ui, sans-serif;
+  --font-serif: 'Lora', Georgia, serif;
+
+  /* Transition */
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+/* ============================================
+   TAILWIND THEME — maps to primitives + mapped tokens
+   ============================================ */
+@theme {
+  /* Fonts */
+  --font-sans: 'Montserrat', system-ui, sans-serif;
+  --font-serif: 'Lora', Georgia, serif;
+
+  /* --- Primitive colors --- */
+  --color-white: #FFFFFF;
+  --color-dark-gray: #202020;
+  --color-gray-1: #6D727A;
+  --color-gray-2: #A2AAB7;
+  --color-gray-3: #BFC8D4;
+  --color-gray-4: #CED3D9;
+  --color-light-gray: #F4F6F9;
+  --color-action-blue: #5496F7;
+  --color-orange: #F2994A;
+  --color-day-image: #D7D7D8;
+
+  /* --- Brand colour primitives --- */
+  --color-brand-oa-blue: #67C8FF;
+  --color-brand-oa-blue-text: #18485C;
+  --color-brand-oa-magenta: #EB5579;
+  --color-brand-oa-green: #A6C311;
+  --color-brand-oa-yellow: #FFCD4B;
+
+  /* --- Mapped: Backgrounds --- */
+  --color-bg-base: #FFFFFF;
+  --color-bg-secondary: #F4F6F9;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-overlay: #202020;
+
+  /* --- Mapped: Actions --- */
+  --color-action-primary: #202020;
+  --color-action-secondary: #5496F7;
+  --color-action-on-primary: #FFFFFF;
+  --color-action-on-secondary: #FFFFFF;
+
+  /* --- Mapped: Text --- */
+  --color-text-primary: #202020;
+  --color-text-secondary: #6D727A;
+  --color-text-tertiary: #A2AAB7;
+  --color-text-disabled: #CED3D9;
+  --color-text-on-dark: #FFFFFF;
+  --color-text-category: #F2994A;
+  --color-text-brand: #18485C;
+
+  /* --- Mapped: Borders --- */
+  --color-border-default: #CED3D9;
+  --color-border-card: #EBEBEB;
+  --color-border-input: #EDF1F8;
+
+  /* --- Labels --- */
+  --color-label-light-primary: #000000;
+
+  /* --- Mapped: Accents --- */
+  --color-accent-blue: #67C8FF;
+  --color-accent-green: #A6C311;
+  --color-accent-magenta: #EB5579;
+  --color-accent-yellow: #FFCD4B;
+
+  /* Breakpoints */
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+}
+
+/* ============================================
+   TYPOGRAPHY UTILITY CLASSES
+   Figma tokens mapped 1:1
+   ============================================ */
+
+.type-display-large {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 32px;
+  line-height: 40px;
+  letter-spacing: 0;
+}
+.type-display-medium {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 24px;
+  letter-spacing: 0;
+}
+.type-headline-large {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 18px;
+  line-height: normal;
+  letter-spacing: -0.36px;
+}
+.type-headline-medium {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 20px;
+  letter-spacing: 0;
+}
+.type-headline-small {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: normal;
+  letter-spacing: -0.28px;
+}
+.type-title-medium {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 16px;
+  line-height: normal;
+  letter-spacing: 0;
+}
+.type-body-default {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0;
+}
+.type-description {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 12px;
+  line-height: normal;
+  letter-spacing: 0;
+}
+.type-pre-text {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 11px;
+  line-height: normal;
+  letter-spacing: -0.22px;
+}
+.type-tags {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 10px;
+  line-height: normal;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+}
+.type-disclaimer {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 8px;
+  line-height: normal;
+  letter-spacing: 0.16px;
+}
+.type-button {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: normal;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+/* ============================================
+   LAYOUT UTILITY CLASSES
+   Consistent section spacing across all pages
+   ============================================ */
+
+/* Content container — max-width + responsive horizontal padding */
+.container-content {
+  max-width: var(--max-w-content);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--space-6);   /* 24px mobile */
+  padding-right: var(--space-6);
+}
+@media (min-width: 768px) {
+  .container-content {
+    padding-left: var(--space-12);  /* 48px tablet */
+    padding-right: var(--space-12);
+  }
+}
+@media (min-width: 1024px) {
+  .container-content {
+    padding-left: var(--space-16);  /* 64px desktop */
+    padding-right: var(--space-16);
+  }
+}
+
+/* Narrow container for text-heavy pages */
+.container-narrow {
+  max-width: var(--max-w-narrow);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--space-6);
+  padding-right: var(--space-6);
+}
+@media (min-width: 768px) {
+  .container-narrow {
+    padding-left: var(--space-12);
+    padding-right: var(--space-12);
+  }
+}
+
+/* Section — vertical padding for major content blocks */
+.section {
+  padding-top: var(--space-8);     /* 32px mobile */
+  padding-bottom: var(--space-8);
+}
+@media (min-width: 768px) {
+  .section {
+    padding-top: var(--space-16);   /* 64px tablet */
+    padding-bottom: var(--space-16);
+  }
+}
+@media (min-width: 1024px) {
+  .section {
+    padding-top: var(--space-20);   /* 80px desktop */
+    padding-bottom: var(--space-20);
+  }
+}
+
+/* Section — tight variant for adjacent related sections */
+.section-tight {
+  padding-top: var(--space-8);     /* 32px mobile */
+  padding-bottom: var(--space-8);
+}
+@media (min-width: 768px) {
+  .section-tight {
+    padding-top: var(--space-8);    /* 32px tablet + desktop */
+    padding-bottom: var(--space-8);
+  }
+}
+
+/* Hero section — extra generous top/bottom */
+.section-hero {
+  padding-top: var(--space-12);    /* 48px mobile */
+  padding-bottom: var(--space-12);
+}
+@media (min-width: 768px) {
+  .section-hero {
+    padding-top: var(--space-20);   /* 80px tablet */
+    padding-bottom: var(--space-20);
+  }
+}
+@media (min-width: 1024px) {
+  .section-hero {
+    padding-top: var(--space-24);   /* 96px desktop */
+    padding-bottom: var(--space-24);
+  }
+}
+
+/* Section heading — gap between heading and content */
+.section-heading-gap {
+  margin-bottom: var(--space-4);   /* 16px mobile */
+}
+@media (min-width: 768px) {
+  .section-heading-gap {
+    margin-bottom: var(--space-8);  /* 32px tablet */
+  }
+}
+@media (min-width: 1024px) {
+  .section-heading-gap {
+    margin-bottom: var(--space-10); /* 40px desktop */
+  }
+}
+
+/* Card grid gap */
+.card-grid-gap {
+  gap: var(--space-2);             /* 8px mobile */
+}
+@media (min-width: 768px) {
+  .card-grid-gap {
+    gap: var(--space-4);            /* 16px tablet+ */
+  }
+}
+
+/* Horizontal scroll gap */
+.scroll-gap {
+  gap: var(--space-2);             /* 8px mobile */
+}
+@media (min-width: 768px) {
+  .scroll-gap {
+    gap: var(--space-4);            /* 16px tablet+ */
+  }
+}
+
+/* ============================================
+   INTERACTION PRIMITIVES (Paper best practices)
+   Keyboard-first, visible focus, explicit states
+   ============================================ */
+
+/* Focus ring — visible on keyboard nav, hidden on pointer */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Interactive card pattern — consistent hover/active for all clickable cards */
+.card-interactive {
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+.card-interactive:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Button base — shared transition for all buttons */
+button, a[role="button"] {
+  transition: background-color var(--transition-fast),
+              color var(--transition-fast),
+              opacity var(--transition-fast);
+}
+
+/* Primary button hover/active */
+.btn-primary {
+  background-color: var(--color-action-primary);
+  color: var(--color-action-on-primary);
+  border-radius: 8px;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+.btn-primary:hover {
+  background-color: #333333;
+}
+.btn-primary:active {
+  transform: scale(0.98);
+}
+.btn-primary:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Nav item pattern */
+.nav-item {
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+.nav-item:hover:not(:disabled) {
+  background-color: var(--color-bg-secondary);
+}
+
+/* ============================================
+   GLOBALS
+   ============================================ */
+
+/*
+ * NOTE: Do NOT use `* { padding: 0; }` here — unlayered rules
+ * override Tailwind utilities (p-4, p-6, etc.) in v4.
+ * Tailwind's preflight + shadcn's @layer base handle resets.
+ * Only box-sizing is safe to set globally.
+ */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+/* Mobile: constrained layout */
+@media (max-width: 767px) {
+  html, body {
+    overflow: hidden;
+    height: 100%;
+  }
+  #root {
+    max-width: 430px;
+    height: 100%;
+    margin: 0 auto;
+    background: var(--color-bg-base);
+    position: relative;
+  }
+}
+
+/* Desktop: natural scroll */
+@media (min-width: 768px) {
+  #root {
+    background: var(--color-bg-base);
+    overflow-y: auto;
+  }
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.video-container video {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  /* Keep Montserrat as primary — override shadcn's Geist */
+  --font-sans: 'Montserrat', system-ui, sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    margin: 0;
+    padding: 0;
+  }
+}

@@ -1,0 +1,27 @@
+# Dependencies
+app/node_modules/
+app/dist/
+
+# Database
+api/openacademy.db
+api/__pycache__/
+api/**/__pycache__/
+
+# Environment
+.env
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Python
+*.pyc
+*.pyo
+
+# Claude
+.claude/
