@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Star, Heart, Search, BookOpen, Clock, Award, Video, HelpCircle, FileText, Users, GraduationCap } from 'lucide-react';
+import { ChevronLeft, Star, Heart, Search, BookOpen, Clock, Award, Video, HelpCircle, FileText, Users, GraduationCap } from 'lucide-react';
 import OAButton from '../components/OAButton';
+import ChaptersRow from '../components/ChaptersRow';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useApi } from '../hooks/useApi';
@@ -367,105 +368,96 @@ export default function LessonDetail() {
         </div>
       </div>
 
-      {/* ===== DESKTOP ===== */}
+      {/* ===== DESKTOP (Figma layout: bundles LEFT, info RIGHT) ===== */}
       <div className="hidden md:flex flex-col flex-1 overflow-y-auto">
-        {/* Hero */}
-        <div className="relative w-full h-[360px]">
-          <img src={lesson.background} alt="" className="w-full h-full object-cover" />
+        {/* Hero — lesson plan thumbnail, 360px */}
+        <div className="relative w-full h-[360px] overflow-hidden">
+          <img src={lesson.thumbnail} alt="" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-          <div className="container-content absolute inset-0 flex flex-col justify-between pt-6 pb-8">
+          <div className="container-content absolute inset-0 flex flex-col justify-between pt-8 pb-4">
             <div className="flex items-center justify-between">
-              <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-text-on-dark hover:opacity-80 transition-opacity w-fit">
-                <ChevronLeft size={18} />
-                <span className="type-headline-small">Back</span>
+              <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-text-on-dark hover:opacity-80 transition-opacity">
+                <ChevronLeft size={16} />
+                <span className="type-headline-small text-text-on-dark">Back</span>
               </button>
               <div className="bg-bg-elevated/90 border border-border-input rounded-lg p-2 flex items-center gap-1 h-[34px]">
                 <div className="w-3.5 h-3.5 rounded-full bg-accent-yellow" />
                 <span className="font-semibold text-[14px] text-text-primary font-sans">{credits}</span>
               </div>
             </div>
-            <div className="max-w-[600px]">
+            <div>
               <span className="type-tags text-accent-blue">{lesson.category}</span>
-              <h1 className="font-bold text-[40px] leading-[48px] text-text-on-dark mt-2 font-sans">{lesson.fullTitle}</h1>
+              <h1 className="font-bold text-[40px] leading-[48px] text-text-on-dark mt-1 font-sans">{lesson.fullTitle}</h1>
             </div>
           </div>
         </div>
 
-        <div className="container-content section">
+        {/* Two-column body: LEFT = bundles with chapters, RIGHT = sticky info */}
+        <div className="container-content py-8">
           <div className="flex gap-12 lg:gap-16">
-            {/* Main column */}
-            <div className="flex-1 flex flex-col gap-8">
-              {/* Meta with icons */}
-              <div className="flex items-center gap-6 text-text-tertiary">
-                <div className="flex items-center gap-1.5">
-                  <Star size={16} fill="var(--color-orange)" color="var(--color-orange)" />
-                  <span className="type-body-default text-text-primary">{lesson.rating}</span>
-                  <span className="type-pre-text text-text-tertiary ml-0.5">{lesson.reviews > 0 ? `${lesson.reviews} reviews` : ''}</span>
-                </div>
-                <div className="w-px h-5 bg-border-default" />
-                <div className="flex items-center gap-1.5">
-                  <BookOpen size={16} className="text-text-primary" />
-                  <span className="type-pre-text text-text-primary">{lesson.bundles.length} Bundles</span>
-                </div>
-                <div className="w-px h-5 bg-border-default" />
-                <div className="flex items-center gap-1.5">
-                  <Clock size={16} className="text-text-primary" />
-                  <span className="type-pre-text text-text-primary">{totalChapters} Chapters</span>
-                </div>
-              </div>
 
-              <p className="type-body-default text-text-secondary md:text-[15px] md:leading-[26px]">{lesson.description}</p>
-
-              {/* Target audience */}
-              <div>
-                <h3 className="type-headline-medium text-text-primary mb-4">Made just for</h3>
-                <div className="flex flex-col gap-3">
-                  {lesson.targetAudience.map((item, i) => (
-                    <div key={i} className="flex items-start gap-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-text-primary mt-2.5 shrink-0" />
-                      <p className="type-body-default text-text-secondary">{item}</p>
-                    </div>
-                  ))}
+            {/* LEFT — Certificate + Bundle listings with ChaptersRow */}
+            <div className="flex-1 min-w-0 flex flex-col gap-8">
+              {/* Certificate badge */}
+              {lesson.certificateOnCompletion && (
+                <div className="bg-accent-yellow/10 rounded-[12px] p-6 flex items-center gap-4">
+                  <Award size={24} className="text-accent-yellow shrink-0" />
+                  <div>
+                    <p className="type-headline-small text-text-primary">Certificate on completion</p>
+                    <p className="type-pre-text text-text-tertiary">Complete all bundles to earn yours</p>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Learning points */}
-              <div>
-                <h3 className="type-headline-medium text-text-primary mb-4">What you'll learn</h3>
-                <div className="flex flex-col gap-3">
-                  {lesson.learningPoints.map((item, i) => (
-                    <div key={i} className="flex items-start gap-3">
-                      <div className="w-5 h-5 rounded-full bg-accent-green/20 flex items-center justify-center mt-0.5 shrink-0">
-                        <span className="text-accent-green text-[10px]">✓</span>
-                      </div>
-                      <p className="type-body-default text-text-secondary">{item}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              {/* Bundle listings */}
+              {lesson.bundles.map((bundle) => (
+                <div key={bundle.id} className="flex">
+                  {/* Vertical progress bar */}
+                  <div className="flex items-stretch px-6 shrink-0">
+                    <div className={cn(
+                      'w-1 rounded-full',
+                      getPercentage(String(bundle.id)) === 100 ? 'bg-accent-green'
+                        : getPercentage(String(bundle.id)) > 0 ? 'bg-accent-blue'
+                        : 'bg-border-default'
+                    )} />
+                  </div>
 
-              {/* Instructors */}
-              <div>
-                <h3 className="type-headline-medium text-text-primary mb-4">Your instructors</h3>
-                <div className="flex gap-6">
-                  {lesson.bundles.filter(b => b.creator).map(b => (
-                    <div key={b.creator!.id} className="flex items-center gap-3">
-                      <img src={b.creator!.avatar} alt={b.creator!.name} className="w-12 h-12 rounded-full object-cover" />
-                      <div>
-                        <p className="type-headline-small text-text-primary">{b.creator!.name}</p>
-                        <p className="type-pre-text text-text-tertiary">{b.creator!.title}</p>
+                  {/* Bundle content */}
+                  <div className="flex-1 min-w-0 flex flex-col gap-6 pb-6">
+                    {/* Detail */}
+                    <div className="flex flex-col gap-2">
+                      <span className="type-tags text-text-primary">{bundle.subtitle}</span>
+                      <h3 className="type-display-medium text-text-secondary">{bundle.title}</h3>
+                      <p className="type-body-default text-text-secondary">{bundle.description}</p>
+                      <div className="flex items-center gap-2 type-tags text-text-secondary">
+                        <span>{bundle.chapterCount || 0} chapters</span>
+                        <span>•</span>
+                        <span>{bundle.totalMinutes} mins</span>
                       </div>
                     </div>
-                  ))}
+
+                    {/* ChaptersRow — horizontal thumbnails */}
+                    <ChaptersRow bundleId={bundle.id} size="small" />
+
+                    {/* CTA button */}
+                    <OAButton
+                      variant="blue"
+                      size="medium"
+                      fullWidth
+                      onClick={() => navigate(`/bundle/${bundle.id}`)}
+                    >
+                      {bundle.isFree ? 'Start Bundle' : `Get this bundle | 🪙 ${bundle.price}`}
+                    </OAButton>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
 
-            {/* Sidebar */}
+            {/* RIGHT — Sticky sidebar */}
             <div className="w-[340px] lg:w-[380px] shrink-0">
-              <div className="sticky top-24 flex flex-col gap-6 py-1">
+              <div className="sticky top-24 flex flex-col gap-8 py-1">
                 {/* CTA card */}
-                <div className="bg-bg-elevated rounded-[16px] p-6 flex flex-col gap-4 overflow-hidden" style={{ boxShadow: 'var(--shadow-button)' }}>
+                <div className="bg-bg-elevated rounded-[16px] p-6 flex flex-col gap-4" style={{ boxShadow: 'var(--shadow-button)' }}>
                   {overallProgress > 0 && (
                     <>
                       <div className="flex items-center justify-between">
@@ -482,49 +474,67 @@ export default function LessonDetail() {
                   </OAButton>
                 </div>
 
-                {/* Bundles list */}
-                <div className="flex flex-col gap-3">
-                  <h3 className="type-headline-medium text-text-primary px-1">Course Content</h3>
-                  {lesson.bundles.map((bundle, idx) => {
-                    const bp = getPercentage(String(bundle.id));
-                    const locked = idx > 0 && getPercentage(String(lesson.bundles[idx - 1].id)) < 100;
-                    return (
-                      <button
-                        key={bundle.id}
-                        onClick={() => !locked && navigate(`/bundle/${bundle.id}`)}
-                        className={cn(
-                          'flex items-center gap-4 p-6 rounded-[12px] text-left',
-                          locked ? 'opacity-50 bg-bg-secondary' : 'bg-bg-secondary hover:bg-gray-4/20 transition-colors'
-                        )}
-                      >
-                        <div className={cn(
-                          'w-10 h-10 rounded-full flex items-center justify-center shrink-0',
-                          bp === 100 ? 'bg-accent-green' : bp > 0 ? 'bg-accent-blue' : 'bg-border-default'
-                        )}>
-                          <span className="type-headline-small text-text-on-dark">{idx + 1}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="type-headline-small text-text-primary truncate">{bundle.title}</p>
-                          <p className="type-description text-text-tertiary mt-1">
-                            {bundle.chapters.length} chapters{bp > 0 && ` · ${bp}%`}
-                          </p>
-                        </div>
-                        <ChevronRight size={16} className={locked ? 'text-text-disabled' : 'text-text-secondary'} />
-                      </button>
-                    );
-                  })}
+                {/* Stats row with icons */}
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-1.5">
+                    <Star size={16} fill="var(--color-orange)" color="var(--color-orange)" />
+                    <span className="type-body-default text-text-primary">{lesson.rating}</span>
+                  </div>
+                  <div className="w-px h-5 bg-border-default" />
+                  <div className="flex items-center gap-1.5">
+                    <BookOpen size={16} className="text-text-primary" />
+                    <span className="type-pre-text text-text-primary">{lesson.bundles.length} Bundles</span>
+                  </div>
+                  <div className="w-px h-5 bg-border-default" />
+                  <div className="flex items-center gap-1.5">
+                    <Clock size={16} className="text-text-primary" />
+                    <span className="type-pre-text text-text-primary">{totalChapters} Chapters</span>
+                  </div>
                 </div>
 
-                {/* Certificate */}
-                {lesson.certificateOnCompletion && (
-                  <div className="bg-accent-yellow/10 rounded-[12px] p-6 flex items-center gap-4">
-                    <Award size={24} className="text-accent-yellow shrink-0" />
-                    <div>
-                      <p className="type-headline-small text-text-primary">Certificate on completion</p>
-                      <p className="type-pre-text text-text-tertiary">Complete all bundles to earn yours</p>
-                    </div>
+                {/* Description */}
+                <p className="type-body-default text-text-secondary">{lesson.description}</p>
+
+                {/* Made just for */}
+                <div className="flex flex-col gap-4">
+                  <h3 className="type-headline-medium text-text-primary">Made just for</h3>
+                  <div className="flex flex-col gap-3">
+                    {lesson.targetAudience.map((item, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <div className="w-1.5 h-1.5 rounded-full bg-text-primary mt-2.5 shrink-0" />
+                        <p className="type-body-default text-text-secondary">{item}</p>
+                      </div>
+                    ))}
                   </div>
-                )}
+                </div>
+
+                {/* What you'll learn */}
+                <div className="flex flex-col gap-4">
+                  <h3 className="type-headline-medium text-text-primary">What you'll learn</h3>
+                  <div className="flex flex-col gap-3">
+                    {lesson.learningPoints.map((item, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <div className="w-5 h-5 rounded-full bg-accent-green/20 flex items-center justify-center mt-0.5 shrink-0">
+                          <span className="text-accent-green text-[10px]">✓</span>
+                        </div>
+                        <p className="type-body-default text-text-secondary">{item}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Instructors */}
+                <div className="flex flex-col gap-4">
+                  <h3 className="type-headline-medium text-text-primary">Your instructors</h3>
+                  <div className="flex flex-wrap gap-6">
+                    {lesson.bundles.filter(b => b.creator).map(b => (
+                      <div key={b.creator!.id} className="flex items-center gap-3">
+                        <img src={b.creator!.avatar} alt={b.creator!.name} className="w-12 h-12 rounded-full object-cover" />
+                        <p className="type-headline-small text-text-primary">{b.creator!.name}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

@@ -11,6 +11,7 @@ from routes import (
     progress_router,
     search_router,
     creators_router,
+    recommendations_router,
 )
 
 app = FastAPI(
@@ -43,6 +44,7 @@ app.include_router(credits_router)
 app.include_router(progress_router)
 app.include_router(search_router)
 app.include_router(creators_router)
+app.include_router(recommendations_router)
 
 
 @app.on_event("startup")

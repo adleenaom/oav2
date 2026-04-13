@@ -6,13 +6,16 @@ import ForYouCard from '../components/ForYouCard';
 import LessonCard from '../components/LessonCard';
 import PromotionBanner from '../components/PromotionBanner';
 import OAButton from '../components/OAButton';
+import PurchaseModal from '../components/PurchaseModal';
 import { useApi } from '../hooks/useApi';
 import { useProgress } from '../hooks/useProgress';
+import { useBundleNavigation } from '../hooks/useBundleNavigation';
 import type { ApiHomeListings } from '../services/types';
 
 export default function LearnHome() {
   const navigate = useNavigate();
   const { data, isLoading } = useApi<ApiHomeListings>('/listings/home');
+  const { modalBundle, handleBundleClick, closeModal } = useBundleNavigation();
   const { getPercentage, getContinueWatching } = useProgress();
 
   const continueWatching = getContinueWatching();
@@ -157,7 +160,7 @@ export default function LearnHome() {
                     size="big"
                     progress={getPercentage(String(bundle.id)) || undefined}
                     price={bundle.is_free ? 'free' : bundle.credits_required}
-                    onClick={() => navigate(`/bundle/${bundle.id}`)}
+                    onClick={() => handleBundleClick(bundle)}
                     className="w-full h-auto aspect-[3/4]"
                   />
                 ))}
@@ -192,6 +195,11 @@ export default function LearnHome() {
 
         <div className="hidden md:block h-20" />
       </div>
+
+      {/* Purchase modal */}
+      {modalBundle && (
+        <PurchaseModal bundle={modalBundle} isOpen={true} onClose={closeModal} />
+      )}
     </div>
   );
 }

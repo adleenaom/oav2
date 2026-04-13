@@ -214,6 +214,30 @@ All pages must follow these rules for desktop (md+):
 
 ### Page Layout Patterns
 
+#### Mandatory section pattern (ALL feed/browse pages)
+
+Every content section on every page MUST follow this exact structure:
+
+```html
+<div className="bg-bg-base section-tight">        <!-- outer: bg + vertical padding -->
+  <div className="container-content">              <!-- inner: max-width + horizontal padding -->
+    <SectionHeader title="..." />                  <!-- heading -->
+    <div className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
+      {/* cards */}                                 <!-- horizontal scroll content -->
+    </div>
+  </div>
+</div>
+```
+
+Rules:
+1. **Outer wrapper**: `bg-bg-base section-tight` — provides vertical padding (32px all breakpoints)
+2. **Inner wrapper**: `container-content` — constrains to `max-w-content` (1120px), adds responsive horizontal padding (24→48→64px)
+3. **Heading**: `SectionHeader` or `type-headline-medium` — always inside `container-content`
+4. **Horizontal scroll**: `mt-4` gap below heading, `-mx-6 px-6` on mobile (cards bleed to edge), `md:mx-0 md:px-0` on desktop (contained)
+5. **Grid layouts**: Use `card-grid-gap` for grids inside `container-content`
+
+This pattern applies to: Homepage, Discover, ViewAll, Profile (continue watching), and any future browse page.
+
 #### Homepage / Feed pages
 ```
 container-content + section-tight (per section)

@@ -7,6 +7,7 @@ from .credits_routes import router as credits_router
 from .progress_routes import router as progress_router
 from .search_routes import router as search_router
 from .creators_routes import router as creators_router
+from .recommendations_routes import router as recommendations_router
 
 __all__ = [
     "auth_router",

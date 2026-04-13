@@ -112,6 +112,31 @@ export function useProgress() {
     });
   }, []);
 
+  /**
+   * Rewatch reset: when a completed chapter is re-watched, remove it from
+   * completedChapters. This makes progress incomplete again (e.g. 4/4 → 3/4 = 75%).
+   */
+  const resetChapterProgress = useCallback((bundleId: string, chapterId: string) => {
+    setStore(prev => {
+      const existing = prev.bundles[bundleId];
+      if (!existing) return prev;
+      const completedChapters = existing.completedChapters.filter(id => id !== chapterId);
+      const next: ProgressStore = {
+        ...prev,
+        bundles: {
+          ...prev.bundles,
+          [bundleId]: {
+            ...existing,
+            completedChapters,
+            lastWatchedAt: Date.now(),
+          },
+        },
+      };
+      save(next);
+      return next;
+    });
+  }, []);
+
   const getBundleProgress = useCallback((bundleId: string): BundleProgress | undefined => {
     return store.bundles[bundleId];
   }, [store]);
@@ -227,6 +252,7 @@ export function useProgress() {
   return {
     trackChapterWatch,
     markChapterComplete,
+    resetChapterProgress,
     getBundleProgress,
     getBundlePercentage,
     getContinueWatching,

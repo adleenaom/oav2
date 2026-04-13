@@ -24,11 +24,12 @@ import Subscription from './pages/Subscription';
 import RedeemCode from './pages/RedeemCode';
 import Referral from './pages/Referral';
 import Settings from './pages/Settings';
+import ChapterPlayer from './pages/ChapterPlayer';
 import { TermsOfUse, PrivacyPolicy, FAQ, ContactUs, Intro, BecomeCreator } from './pages/StaticPage';
 
 function AppLayout() {
   const location = useLocation();
-  const isFullscreen = location.pathname.startsWith('/foryou');
+  const isFullscreen = location.pathname.startsWith('/foryou') || location.pathname.startsWith('/play');
   const isAuthPage = ['/login', '/register', '/forgot-password', '/intro'].includes(location.pathname);
   const hideChrome = isFullscreen || isAuthPage;
 
@@ -40,6 +41,7 @@ function AppLayout() {
           {/* Core */}
           <Route path="/" element={<LearnHome />} />
           <Route path="/foryou/:index" element={<ForYouPlayer />} />
+          <Route path="/play/:bundleId/:chapterIndex" element={<ChapterPlayer />} />
           <Route path="/bundle/:id" element={<BundleDetail />} />
           <Route path="/lesson/:id" element={<LessonDetail />} />
           <Route path="/viewall/:type" element={<ViewAll />} />

@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { useApi } from '../hooks/useApi';
 import { useProgress } from '../hooks/useProgress';
 import { useCredits } from '../hooks/useCredits';
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import type { ApiBundleDetail } from '../services/types';
 
 type Tab = 'about' | 'chapters';
@@ -14,7 +14,7 @@ type Tab = 'about' | 'chapters';
 export default function BundleDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getBundleProgress, trackChapterWatch, markChapterComplete, getBundlePercentage } = useProgress();
+  const { getBundleProgress, getBundlePercentage } = useProgress();
   const { credits, purchaseBundle, isBundleAccessible } = useCredits();
   const { data: apiBundle, isLoading } = useApi<ApiBundleDetail>(id ? `/bundles/${id}` : null);
 
@@ -49,48 +49,21 @@ export default function BundleDetail() {
   const parentLesson = bundle?.planId ? { id: bundle.planId } : null;
 
   const [activeTab, setActiveTab] = useState<Tab>('chapters');
-  const [playingChapterId, setPlayingChapterId] = useState<string | null>(null);
   const [purchaseError, setPurchaseError] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="type-body-default text-text-tertiary">Loading...</div></div>;
   }
   if (!bundle) { navigate('/'); return null; }
 
-  const playingChapter = bundle.chapters.find(c => String(c.id) === playingChapterId);
   const isInProgress = percentage > 0 && percentage < 100;
   const isCompleted = percentage === 100;
   const hasAccess = isBundleAccessible(bundle.id, bundle.isFree);
 
   const handlePlayChapter = (chapterId: string) => {
     if (!hasAccess) return;
-    setPlayingChapterId(chapterId);
-
-    // Track this chapter watch for Continue Watching
-    const chapter = bundle.chapters.find(c => String(c.id) === chapterId);
-    if (chapter) {
-      trackChapterWatch({
-        bundleId: String(bundle.id),
-        bundleTitle: bundle.title,
-        planId: bundle.planId ? String(bundle.planId) : null,
-        totalChapters: bundle.chapters.length,
-        chapterId: String(chapter.id),
-        chapterThumbnail: chapter.thumbnail || bundle.thumbnail,
-        chapterTitle: chapter.title,
-      });
-    }
-
-    setTimeout(() => { videoRef.current?.play().catch(() => {}); }, 100);
-  };
-
-  const handleVideoEnded = () => {
-    if (playingChapterId) {
-      markChapterComplete(String(bundle.id), playingChapterId);
-      const idx = bundle.chapters.findIndex(c => String(c.id) === playingChapterId);
-      if (idx < bundle.chapters.length - 1) handlePlayChapter(String(bundle.chapters[idx + 1].id));
-      else setPlayingChapterId(null);
-    }
+    const idx = bundle.chapters.findIndex(c => String(c.id) === chapterId);
+    navigate(`/play/${bundle.id}/${idx >= 0 ? idx : 0}`);
   };
 
   const handlePurchase = async () => {
@@ -111,10 +84,6 @@ export default function BundleDetail() {
     handlePlayChapter(String(first?.id || bundle.chapters[0].id));
   };
 
-  const getChapterVideoUrl = (ch: typeof bundle.chapters[0]) => {
-    const vp = ch.parts.find((p: { type: string; url?: string }) => p.type === 'video');
-    return vp?.url || '';
-  };
 
   const ctaLabel = !hasAccess
     ? `Unlock for ${bundle.price} coins`
@@ -128,19 +97,8 @@ export default function BundleDetail() {
         <div className="flex-1 overflow-y-auto hide-scrollbar pb-[106px]">
 
           {/* Video player — vertical 9:16 like YouTube Shorts */}
-          {playingChapter ? (
-            <div className="bg-black px-4 pt-14 pb-4">
-              <div className="relative w-full aspect-[9/16] max-h-[70vh] mx-auto rounded-[16px] overflow-hidden bg-bg-overlay">
-                <video ref={videoRef} className="w-full h-full object-cover" src={getChapterVideoUrl(playingChapter)} playsInline controls onEnded={handleVideoEnded} />
-              </div>
-              <button onClick={() => setPlayingChapterId(null)} className="absolute top-[53px] left-6 bg-black/50 rounded-lg px-3 py-2 flex items-center gap-1.5 z-10">
-                <ChevronLeft size={13} className="text-text-on-dark" />
-                <span className="type-button text-text-on-dark">Back</span>
-              </button>
-            </div>
-          ) : (
-            /* Hero bg */
-            <div className="relative w-full h-[281px] overflow-hidden">
+          {/* Hero bg */}
+          <div className="relative w-full h-[281px] overflow-hidden">
               <img src={bundle.thumbnail} alt="" className="absolute inset-0 w-full h-full object-cover scale-110 blur-[2px]" />
               <div className="absolute inset-0 bg-black/20" />
               {/* App bar */}
@@ -157,14 +115,13 @@ export default function BundleDetail() {
                   <span className="font-semibold text-[14px] text-text-primary leading-[20px] font-sans">{credits}</span>
                 </div>
               </div>
-            </div>
-          )}
+          </div>
 
           {/* ---- Floating title card with tabs ---- */}
           <div
             className={cn(
               "mx-5 bg-bg-elevated rounded-[16px] flex flex-col",
-              playingChapter ? 'mt-4' : '-mt-[160px] relative z-10'
+              '-mt-[160px] relative z-10'
             )}
             style={{ boxShadow: '0 0 24px rgba(0,0,0,0.12)' }}
           >
@@ -292,7 +249,7 @@ export default function BundleDetail() {
               {bundle.chapters.map((chapter, idx) => {
                 const chId = String(chapter.id);
                 const done = completedChapters.includes(chId);
-                const isPlaying = playingChapterId === chId;
+                const isPlaying = false;
                 const isLocked = !hasAccess && idx > 0;
                 const hasSurvey = chapter.parts.some(p => p.type === 'survey');
                 const isViewed = done;
@@ -392,7 +349,7 @@ export default function BundleDetail() {
 
       {/* ===== DESKTOP ===== */}
       <div className="hidden md:flex flex-col flex-1 overflow-y-auto">
-        {!playingChapter && (
+        {(
           <div className="relative w-full h-[360px]">
             <img src={bundle.thumbnail} alt="" className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
@@ -410,31 +367,9 @@ export default function BundleDetail() {
         )}
 
         <div className="container-content section">
-          {playingChapter && (
-            <button onClick={() => navigate(-1)} className="flex items-center gap-2 mb-6 text-text-secondary hover:text-text-primary transition-colors">
-              <ChevronLeft size={18} />
-              <span className="type-headline-small">Back</span>
-            </button>
-          )}
-
           <div className="flex gap-12 lg:gap-16">
             {/* Left column */}
             <div className="flex-1 min-w-0">
-              {/* Vertical 9:16 video player */}
-              {playingChapter && (
-                <div className="flex gap-6 mb-8">
-                  <div className="w-[300px] lg:w-[340px] shrink-0 aspect-[9/16] max-h-[600px] bg-bg-overlay rounded-[16px] overflow-hidden">
-                    <video ref={videoRef} className="w-full h-full object-cover" src={getChapterVideoUrl(playingChapter)} playsInline controls onEnded={handleVideoEnded} />
-                  </div>
-                  {/* Chapter info beside video */}
-                  <div className="flex flex-col gap-3 py-4 min-w-0">
-                    <span className="type-tags text-text-category">{bundle.category}</span>
-                    <h3 className="type-headline-medium text-text-primary">{playingChapter.title}</h3>
-                    <span className="type-pre-text text-text-tertiary">{playingChapter.duration}</span>
-                    <p className="type-body-default text-text-secondary line-clamp-4">{bundle.description}</p>
-                  </div>
-                </div>
-              )}
 
               {/* Tab bar */}
               <div className="flex border-b border-border-default mb-6">
@@ -497,7 +432,7 @@ export default function BundleDetail() {
                   {bundle.chapters.map((chapter, idx) => {
                     const chId = String(chapter.id);
                     const done = completedChapters.includes(chId);
-                    const isPlaying = playingChapterId === chId;
+                    const isPlaying = false;
                     const isLocked = !hasAccess && idx > 0;
                     const hasSurvey = chapter.parts.some(p => p.type === 'survey');
                     const isViewed = done;
