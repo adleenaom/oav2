@@ -403,10 +403,10 @@ export default function BundleDetail() {
         <div className="container-content section">
           <div className="flex gap-10 lg:gap-14">
 
-            {/* LEFT — Chapter cards with thumbnails */}
+            {/* LEFT — Chapter listing with number + thumbnail + border-bottom */}
             <div className="flex-1 min-w-0">
               <h2 className="type-headline-large text-text-primary mb-5">Chapters ({bundle.chapters.length})</h2>
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col">
                 {bundle.chapters.map((chapter, idx) => {
                   const chId = String(chapter.id);
                   const done = completedChapters.includes(chId);
@@ -421,17 +421,25 @@ export default function BundleDetail() {
                       onClick={() => !isLocked && handlePlayChapter(chId)}
                       disabled={isLocked}
                       className={cn(
-                        'flex gap-5 p-6 rounded-[16px] text-left w-full transition-colors',
-                        isLocked ? 'opacity-50 bg-bg-secondary' : 'bg-bg-secondary hover:bg-gray-4/20'
+                        'flex items-start gap-5 py-5 text-left w-full transition-colors border-b border-border-default',
+                        isLocked ? 'opacity-50' : 'hover:bg-bg-secondary/50'
                       )}
                     >
+                      {/* Chapter number */}
+                      <span className={cn(
+                        'text-[16px] font-semibold tabular-nums shrink-0 w-6 text-center mt-1 font-sans',
+                        isGrayed ? 'text-text-tertiary' : 'text-text-secondary'
+                      )}>
+                        {idx + 1}
+                      </span>
+
                       {/* Thumbnail */}
-                      <div className="w-[100px] h-[133px] rounded-[8px] overflow-hidden bg-bg-base shrink-0">
+                      <div className="w-[80px] h-[107px] rounded-[8px] overflow-hidden bg-bg-secondary shrink-0">
                         <img src={chapter.seriesImage || bundle.thumbnail} alt="" className="w-full h-full object-cover" />
                       </div>
 
                       {/* Content */}
-                      <div className="flex-1 min-w-0 flex flex-col gap-3">
+                      <div className="flex-1 min-w-0 flex flex-col gap-2 py-0.5">
                         <div className="flex items-center gap-4">
                           <h3 className={cn(
                             'type-display-medium truncate flex-1',
@@ -439,13 +447,13 @@ export default function BundleDetail() {
                           )}>
                             {chapter.title}
                           </h3>
-                          <Heart size={24} className={cn(
+                          <Heart size={22} className={cn(
                             'shrink-0',
                             done ? 'text-accent-magenta fill-accent-magenta' : 'text-text-tertiary'
                           )} />
                         </div>
 
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
                           {chapter.duration && chapter.duration !== '1 PARTS' && (
                             <span className={cn('type-tags', isGrayed ? 'text-text-tertiary' : 'text-text-secondary')}>
                               {chapter.duration}
@@ -476,8 +484,9 @@ export default function BundleDetail() {
               </div>
             </div>
 
-            {/* RIGHT — Info cards */}
-            <div className="w-[300px] lg:w-[340px] shrink-0 flex flex-col gap-5">
+            {/* RIGHT — Info cards (sticky) */}
+            <div className="w-[300px] lg:w-[340px] shrink-0">
+              <div className="sticky top-20 flex flex-col gap-5">
               <div className="bg-bg-secondary rounded-[16px] p-6">
                 <h3 className="type-headline-small text-text-primary mb-3">About</h3>
                 <p className="type-body-default text-text-secondary">{bundle.description}</p>
@@ -538,6 +547,7 @@ export default function BundleDetail() {
                   <p className="type-headline-small text-text-primary">View full lesson plan →</p>
                 </button>
               )}
+              </div>
             </div>
           </div>
         </div>
