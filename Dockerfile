@@ -2,6 +2,9 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
+# Cache bust: this ARG changes with every commit, forcing rebuild
+ARG CACHEBUST=1
+
 COPY app/package.json app/package-lock.json ./
 RUN npm install
 
@@ -14,7 +17,6 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Copy built static files and server
 COPY --from=build /app/dist ./dist
 COPY server.js ./
 
