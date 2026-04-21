@@ -51,8 +51,15 @@ function proxyRequest(req, res, upstreamPath) {
     delete forwardHeaders['host'];
     delete forwardHeaders['connection'];
     delete forwardHeaders['content-length'];
-    delete forwardHeaders['transfer-encoding']; // fixes 400 from Coolify's chunked forwarding
-    delete forwardHeaders['accept-encoding'];   // avoids br/zstd responses the proxy can't decompress
+    delete forwardHeaders['transfer-encoding'];
+    delete forwardHeaders['accept-encoding'];
+
+    // Strip proxy/CDN headers added by Coolify/Traefik/Cloudflare — upstream rejects them
+    for (const key of Object.keys(forwardHeaders)) {
+      if (key.startsWith('x-forwarded') || key.startsWith('x-real') || key.startsWith('cf-') || key === 'true-client-ip') {
+        delete forwardHeaders[key];
+      }
+    }
 
     const options = {
       hostname: UPSTREAM_HOST,
