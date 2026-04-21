@@ -1,7 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Globe, BookOpen } from 'lucide-react';
+import { Globe, BookOpen } from 'lucide-react';
 import { useCreator } from '../hooks/useOAData';
 import BundleThumbnail from '../components/BundleThumbnail';
+import Breadcrumb from '../components/Breadcrumb';
 
 // Creator detail type is resolved from useCreator hook
 
@@ -26,10 +27,11 @@ export default function CreatorProfile() {
         <div className="bg-bg-secondary">
           <div className="container-content py-8 md:py-12">
             {/* Back */}
-            <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors mb-6">
-              <ChevronLeft size={18} />
-              <span className="type-headline-small">Back</span>
-            </button>
+            <Breadcrumb items={[
+              { label: 'Home', path: '/' },
+              { label: 'Discover', path: '/discover' },
+              { label: creator.name },
+            ]} />
 
             <div className="flex items-start gap-6">
               <img src={creator.avatar} alt={creator.name} className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-2 border-accent-yellow shrink-0" />

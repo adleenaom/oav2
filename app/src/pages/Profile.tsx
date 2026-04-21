@@ -15,14 +15,14 @@ export default function Profile() {
   const navigate = useNavigate();
   const { user, isLoggedIn } = useAuth();
   const { getContinueWatching, removeFromContinueWatching } = useProgress();
-  const { credits } = useCredits();
+  const { credits, purchasedBundleIds } = useCredits();
   const { likes } = useLikes();
 
   const continueWatching = getContinueWatching();
   const continueRef = useRef<HTMLDivElement>(null);
   const recentRef = useRef<HTMLDivElement>(null);
 
-  // Fetch user's purchased bundles/plans from API
+  // Fetch user's purchased bundles/plans from API + locally purchased bundles
   const [myBundles, setMyBundles] = useState<OABundle[]>([]);
   const [myPlans, setMyPlans] = useState<OAPlan[]>([]);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -32,18 +32,28 @@ export default function Profile() {
     setProfileLoading(true);
     apiPost<{ bundles: { id: number }[]; plans: { id: number }[]; continueWatch: any[]; watchAgain: any[] }>('/v3/profile/home', {})
       .then(async (res) => {
-        const bundleIds = (res.bundles || []).map(b => b.id);
+        // Merge API bundle IDs with locally purchased IDs
+        const apiBundleIds = (res.bundles || []).map(b => b.id);
+        const allBundleIds = [...new Set([...apiBundleIds, ...purchasedBundleIds])];
         const planIds = (res.plans || []).map(p => p.id);
         const [resolvedBundles, resolvedPlans] = await Promise.all([
-          bundleIds.length > 0 ? getBundles(bundleIds) : Promise.resolve([]),
+          allBundleIds.length > 0 ? getBundles(allBundleIds) : Promise.resolve([]),
           planIds.length > 0 ? getPlans(planIds) : Promise.resolve([]),
         ]);
         setMyBundles(resolvedBundles);
         setMyPlans(resolvedPlans);
       })
-      .catch(() => {})
+      .catch(async () => {
+        // API failed but we still have local purchases
+        if (purchasedBundleIds.length > 0) {
+          try {
+            const resolved = await getBundles(purchasedBundleIds);
+            setMyBundles(resolved);
+          } catch {}
+        }
+      })
       .finally(() => setProfileLoading(false));
-  }, [isLoggedIn]);
+  }, [isLoggedIn, purchasedBundleIds.length]);
 
   if (!isLoggedIn) {
     return (

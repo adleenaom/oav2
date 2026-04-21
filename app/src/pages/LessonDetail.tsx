@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Star, Heart, Search, BookOpen, Clock, Award, Video, HelpCircle, FileText, Users, GraduationCap } from 'lucide-react';
 import OAButton from '../components/OAButton';
 import ChaptersRow from '../components/ChaptersRow';
+import Breadcrumb from '../components/Breadcrumb';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { usePlanDetail } from '../hooks/useOAData';
@@ -379,6 +380,11 @@ export default function LessonDetail() {
 
         {/* Two-column body: LEFT = bundles with chapters, RIGHT = sticky info */}
         <div className="container-content py-8">
+          <Breadcrumb items={[
+            { label: 'Home', path: '/' },
+            { label: 'Lessons', path: '/viewall/lessons' },
+            { label: lesson.fullTitle },
+          ]} />
           <div className="flex gap-12 lg:gap-16">
 
             {/* LEFT — Certificate + Bundle listings with ChaptersRow */}

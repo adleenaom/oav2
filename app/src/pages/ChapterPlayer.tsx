@@ -172,7 +172,7 @@ export default function ChapterPlayer() {
   const handlePurchase = async () => {
     if (!bundle) return;
     setPurchaseError(false);
-    const success = await purchaseBundle(bundle.id);
+    const success = await purchaseBundle(bundle.id, oaBundle?.creditsRequired ?? 0);
     if (success) {
       setPlayerState('playing');
     } else {

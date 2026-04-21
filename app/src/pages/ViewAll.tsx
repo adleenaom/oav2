@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import BundleThumbnail from '../components/BundleThumbnail';
 import LessonCard from '../components/LessonCard';
+import Breadcrumb from '../components/Breadcrumb';
 import { useHomepage } from '../hooks/useHomepage';
 import { useProgress } from '../hooks/useProgress';
 import { getLearnListings, getDailyVideos, type OADailyVideo } from '../services/oa-api';
@@ -153,10 +154,10 @@ export default function ViewAll() {
         {/* Header */}
         <div className="bg-bg-secondary">
           <div className="container-content py-8">
-            <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors mb-4">
-              <ChevronLeft size={18} />
-              <span className="type-headline-small">Back</span>
-            </button>
+            <Breadcrumb items={[
+              { label: 'Home', path: '/' },
+              { label: title },
+            ]} />
             <h1 className="type-display-large text-text-primary">{title}</h1>
           </div>
         </div>

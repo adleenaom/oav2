@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Heart, Trash2 } from 'lucide-react';
+import { Heart, Trash2 } from 'lucide-react';
+import Breadcrumb from '../components/Breadcrumb';
 import { useLikes } from '../hooks/useLikes';
 import { useHomepage } from '../hooks/useHomepage';
 
@@ -22,9 +23,11 @@ export default function Liked() {
       <div className="flex-1 overflow-y-auto hide-scrollbar pb-[106px] md:pb-0">
         <div className="bg-bg-secondary">
           <div className="container-content py-6 md:py-8">
-            <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors mb-4">
-              <ChevronLeft size={18} /><span className="type-headline-small">Back</span>
-            </button>
+            <Breadcrumb items={[
+              { label: 'Home', path: '/' },
+              { label: 'Profile', path: '/profile' },
+              { label: 'My Likes' },
+            ]} />
             <h1 className="type-display-large text-text-primary">My Likes</h1>
           </div>
         </div>

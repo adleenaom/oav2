@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, Bell, Heart, CreditCard, Settings, Gift, LogOut, ChevronRight } from 'lucide-react';
+import oaLogo from '../assets/OA-Logo.png';
 import { useAuth } from '../hooks/useAuth';
+import { useCredits } from '../hooks/useCredits';
 import { useLikes } from '../hooks/useLikes';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +16,7 @@ export default function TopNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isLoggedIn, logout } = useAuth();
+  const { credits } = useCredits();
   const { likes } = useLikes();
   const [scrolled, setScrolled] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -77,13 +80,8 @@ export default function TopNav() {
       <div className="flex items-center justify-between h-16 px-8 lg:px-12">
         {/* Logo */}
         <button onClick={() => navigate('/')} className="flex items-center gap-2 nav-item rounded-lg px-2 py-1">
-          <div className="flex items-center gap-1.5">
-            <div className="flex gap-0.5">
-              <div className="w-2.5 h-4 bg-accent-blue rounded-[3px] border-2 border-action-secondary" />
-              <div className="w-2.5 h-4 bg-accent-blue rounded-[3px] border-2 border-action-secondary" />
-            </div>
-            <span className="type-headline-large text-text-primary">OpenAcademy</span>
-          </div>
+          <img src={oaLogo} alt="OpenAcademy" className="h-8 w-auto" />
+          <span className="type-headline-large text-text-primary">OpenAcademy</span>
         </button>
 
         {/* Nav tabs */}
@@ -121,7 +119,7 @@ export default function TopNav() {
               <div className="flex items-center gap-2">
                 <div className="bg-bg-secondary rounded-lg px-3 py-1.5 flex items-center gap-1.5">
                   <div className="w-3 h-3 rounded-full bg-accent-yellow" />
-                  <span className="type-description font-semibold text-text-primary">{user?.credits ?? 0}</span>
+                  <span className="type-description font-semibold text-text-primary">{credits}</span>
                 </div>
 
                 {/* Profile avatar button */}
