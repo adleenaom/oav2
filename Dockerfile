@@ -22,13 +22,54 @@ RUN printf 'server {\n\
     server_name _;\n\
     root /usr/share/nginx/html;\n\
     index index.html;\n\
+    client_max_body_size 10m;\n\
     location / { try_files $uri $uri/ /index.html; }\n\
     location /assets/ { expires 1y; add_header Cache-Control "public, immutable"; }\n\
-    location /api/ { proxy_pass https://app.theopenacademy.org/api/; proxy_set_header Host app.theopenacademy.org; proxy_ssl_server_name on; }\n\
-    location /auth/ { proxy_pass https://app.theopenacademy.org/api/auth/; proxy_set_header Host app.theopenacademy.org; proxy_ssl_server_name on; }\n\
-    location /guest/ { proxy_pass https://app.theopenacademy.org/api/guest/; proxy_set_header Host app.theopenacademy.org; proxy_ssl_server_name on; }\n\
-    location /v3/ { proxy_pass https://app.theopenacademy.org/api/v3/; proxy_set_header Host app.theopenacademy.org; proxy_ssl_server_name on; }\n\
-    location /media/ { proxy_pass https://app.theopenacademy.org/media/; proxy_set_header Host app.theopenacademy.org; proxy_ssl_server_name on; }\n\
+    location /api/ {\n\
+        proxy_pass https://app.theopenacademy.org/api/;\n\
+        proxy_set_header Host app.theopenacademy.org;\n\
+        proxy_set_header X-Real-IP $remote_addr;\n\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
+        proxy_set_header X-Forwarded-Proto $scheme;\n\
+        proxy_ssl_server_name on;\n\
+        proxy_pass_request_headers on;\n\
+    }\n\
+    location /auth/ {\n\
+        proxy_pass https://app.theopenacademy.org/api/auth/;\n\
+        proxy_set_header Host app.theopenacademy.org;\n\
+        proxy_set_header X-Real-IP $remote_addr;\n\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
+        proxy_set_header X-Forwarded-Proto $scheme;\n\
+        proxy_ssl_server_name on;\n\
+        proxy_pass_request_headers on;\n\
+    }\n\
+    location /guest/ {\n\
+        proxy_pass https://app.theopenacademy.org/api/guest/;\n\
+        proxy_set_header Host app.theopenacademy.org;\n\
+        proxy_set_header X-Real-IP $remote_addr;\n\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
+        proxy_set_header X-Forwarded-Proto $scheme;\n\
+        proxy_ssl_server_name on;\n\
+        proxy_pass_request_headers on;\n\
+    }\n\
+    location /v3/ {\n\
+        proxy_pass https://app.theopenacademy.org/api/v3/;\n\
+        proxy_set_header Host app.theopenacademy.org;\n\
+        proxy_set_header X-Real-IP $remote_addr;\n\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
+        proxy_set_header X-Forwarded-Proto $scheme;\n\
+        proxy_ssl_server_name on;\n\
+        proxy_pass_request_headers on;\n\
+    }\n\
+    location /media/ {\n\
+        proxy_pass https://app.theopenacademy.org/media/;\n\
+        proxy_set_header Host app.theopenacademy.org;\n\
+        proxy_set_header X-Real-IP $remote_addr;\n\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
+        proxy_set_header X-Forwarded-Proto $scheme;\n\
+        proxy_ssl_server_name on;\n\
+        proxy_pass_request_headers on;\n\
+    }\n\
 }\n' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
