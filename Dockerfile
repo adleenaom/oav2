@@ -24,70 +24,61 @@ server {
     index index.html;
     client_max_body_size 10m;
 
-    resolver 8.8.8.8 8.8.4.4 valid=30s ipv6=off;
-    resolver_timeout 5s;
-
-    set $backend https://app.theopenacademy.org;
-
+    # SPA fallback
     location / {
         try_files $uri $uri/ /index.html;
     }
 
+    # Static asset caching
     location /assets/ {
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
 
+    # API proxy — static proxy_pass with URI does automatic path rewriting:
+    # /v3/listings/learn → https://app.theopenacademy.org/api/v3/listings/learn
     location /v3/ {
-        rewrite ^/v3/(.*)$ /api/v3/$1 break;
-        proxy_pass $backend;
+        proxy_pass https://app.theopenacademy.org/api/v3/;
         proxy_set_header Host app.theopenacademy.org;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
         proxy_ssl_server_name on;
         proxy_ssl_protocols TLSv1.2 TLSv1.3;
-        proxy_pass_request_headers on;
-        proxy_pass_request_body on;
+        proxy_redirect off;
     }
 
     location /auth/ {
-        rewrite ^/auth/(.*)$ /api/auth/$1 break;
-        proxy_pass $backend;
+        proxy_pass https://app.theopenacademy.org/api/auth/;
         proxy_set_header Host app.theopenacademy.org;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
         proxy_ssl_server_name on;
         proxy_ssl_protocols TLSv1.2 TLSv1.3;
-        proxy_pass_request_headers on;
-        proxy_pass_request_body on;
+        proxy_redirect off;
     }
 
     location /guest/ {
-        rewrite ^/guest/(.*)$ /api/guest/$1 break;
-        proxy_pass $backend;
+        proxy_pass https://app.theopenacademy.org/api/guest/;
         proxy_set_header Host app.theopenacademy.org;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
         proxy_ssl_server_name on;
         proxy_ssl_protocols TLSv1.2 TLSv1.3;
-        proxy_pass_request_headers on;
-        proxy_pass_request_body on;
+        proxy_redirect off;
     }
 
     location /media/ {
-        rewrite ^/media/(.*)$ /media/$1 break;
-        proxy_pass $backend;
+        proxy_pass https://app.theopenacademy.org/media/;
         proxy_set_header Host app.theopenacademy.org;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
         proxy_ssl_server_name on;
         proxy_ssl_protocols TLSv1.2 TLSv1.3;
-        proxy_pass_request_headers on;
-        proxy_pass_request_body on;
+        proxy_redirect off;
     }
 }
 NGINXEOF
