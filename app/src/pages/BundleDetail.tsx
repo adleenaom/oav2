@@ -336,20 +336,20 @@ export default function BundleDetail() {
       {/* ===== DESKTOP — Spotify-inspired layout ===== */}
       <div className="hidden md:flex flex-col flex-1 overflow-y-auto">
 
-        {/* Hero header — blurred background + title overlay */}
-        <div className="relative w-full overflow-hidden" style={{ minHeight: '320px' }}>
+        {/* Hero header — blurred background + title + action bar */}
+        <div className="relative w-full overflow-hidden">
           {/* Blurred bg image */}
           <img src={bundle.thumbnail} alt="" className="absolute inset-0 w-full h-full object-cover scale-110 blur-[20px] brightness-[0.4]" />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/60" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-black/70" />
 
           {/* Content overlay */}
-          <div className="container-content relative z-10 flex flex-col justify-end py-10">
+          <div className="relative z-10 px-8 lg:px-12 pt-6 pb-8 flex flex-col justify-end" style={{ minHeight: '300px' }}>
             <Breadcrumb items={[
               { label: 'Home', path: '/' },
               ...(bundle.planId ? [{ label: 'Lesson', path: `/lesson/${bundle.planId}` }] : []),
               { label: bundle.title },
             ]} />
-            <h1 className="font-bold text-[40px] lg:text-[48px] leading-[1.1] text-white mt-2 font-sans max-w-[700px]">
+            <h1 className="font-bold text-[40px] lg:text-[48px] leading-[1.1] text-white mt-2 font-sans">
               {bundle.title}
             </h1>
             <div className="flex items-center gap-3 mt-3">
@@ -363,112 +363,121 @@ export default function BundleDetail() {
                 </>
               )}
             </div>
+
+            {/* Action bar inside hero */}
+            <div className="flex items-center gap-4 mt-6">
+              <OAButton
+                variant={hasAccess ? 'blue' : 'primary'}
+                size="medium"
+                onClick={handleCTA}
+              >
+                {ctaLabel}
+              </OAButton>
+
+              <button className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors">
+                <Heart size={18} className="text-white" />
+              </button>
+              <button className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors">
+                <Share2 size={18} className="text-white" />
+              </button>
+
+              {!hasAccess && (
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <div className="w-4 h-4 rounded-full bg-accent-yellow" />
+                  <span className="type-headline-small text-white">{bundle.price}</span>
+                  <span className="type-description text-white/60">credits</span>
+                </div>
+              )}
+              {hasAccess && (
+                <span className="type-pre-text text-accent-green ml-auto">{bundle.isFree ? 'Free access' : 'Purchased'}</span>
+              )}
+              {purchaseError && (
+                <span className="type-description text-accent-magenta ml-auto">Not enough credits ({credits} available)</span>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Action bar — unlock/play, like, share */}
-        <div className="container-content py-5 flex items-center gap-4 border-b border-border-default">
-          <OAButton
-            variant={hasAccess ? 'blue' : 'primary'}
-            size="medium"
-            onClick={handleCTA}
-          >
-            {ctaLabel}
-          </OAButton>
-
-          <button className="w-10 h-10 rounded-full border border-border-default flex items-center justify-center hover:border-text-primary transition-colors">
-            <Heart size={18} className="text-text-secondary" />
-          </button>
-          <button className="w-10 h-10 rounded-full border border-border-default flex items-center justify-center hover:border-text-primary transition-colors">
-            <Share2 size={18} className="text-text-secondary" />
-          </button>
-
-          {!hasAccess && (
-            <div className="flex items-center gap-1.5 ml-auto">
-              <div className="w-4 h-4 rounded-full bg-accent-yellow" />
-              <span className="type-headline-small text-text-primary">{bundle.price}</span>
-              <span className="type-description text-text-tertiary">credits</span>
-            </div>
-          )}
-          {hasAccess && (
-            <span className="type-pre-text text-accent-green ml-auto">{bundle.isFree ? 'Free access' : 'Purchased'}</span>
-          )}
-          {purchaseError && (
-            <span className="type-description text-accent-magenta ml-auto">Not enough credits ({credits} available)</span>
-          )}
-        </div>
-
-        {/* Two-column body: LEFT = chapters, RIGHT = info cards */}
-        <div className="container-content section">
+        {/* Two-column body — full width padding matching hero */}
+        <div className="px-8 lg:px-12 py-8">
           <div className="flex gap-10 lg:gap-14">
 
-            {/* LEFT — Chapter listing (bigger) */}
+            {/* LEFT — Chapter listing (reuses mobile pattern) */}
             <div className="flex-1 min-w-0">
-              <h2 className="type-headline-large text-text-primary mb-5">Chapters</h2>
-              <div className="flex flex-col gap-3">
+              <h2 className="type-headline-large text-text-primary mb-5">Chapters ({bundle.chapters.length})</h2>
+              <div className="flex flex-col">
                 {bundle.chapters.map((chapter, idx) => {
                   const chId = String(chapter.id);
                   const done = completedChapters.includes(chId);
                   const isLocked = !hasAccess && idx > 0;
                   const hasSurvey = chapter.hasAssessment;
                   const isViewed = done;
+                  const isGrayed = isViewed;
+
                   return (
-                    <button
-                      key={chapter.id}
-                      onClick={() => !isLocked && handlePlayChapter(chId)}
-                      disabled={isLocked}
-                      className={cn(
-                        'flex items-center gap-5 p-4 rounded-[12px] text-left w-full transition-colors group',
-                        isLocked ? 'opacity-50 bg-bg-secondary'
-                          : 'hover:bg-bg-secondary'
-                      )}
-                    >
-                      {/* Number */}
-                      <span className={cn(
-                        'text-[18px] font-bold tabular-nums shrink-0 w-8 text-center font-sans',
-                        isViewed ? 'text-text-tertiary' : 'text-text-secondary'
-                      )}>
-                        {idx + 1}
-                      </span>
+                    <div key={chapter.id}>
+                      <div className={cn('py-4 flex flex-col gap-4')}>
+                        <button
+                          onClick={() => !isLocked && handlePlayChapter(chId)}
+                          className="flex flex-col gap-4 text-left w-full"
+                          disabled={isLocked}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="flex-1 flex items-center gap-4 min-w-0">
+                              <h3 className={cn(
+                                'type-display-medium truncate',
+                                isGrayed ? 'text-text-tertiary' : 'text-text-primary'
+                              )}>
+                                {chapter.title}
+                              </h3>
+                              <ChevronRight size={12} className={cn(
+                                'shrink-0',
+                                isGrayed ? 'text-text-tertiary' : 'text-text-secondary'
+                              )} />
+                            </div>
+                            <Heart
+                              size={24}
+                              className={cn(
+                                done ? 'text-accent-magenta fill-accent-magenta'
+                                  : 'text-text-tertiary'
+                              )}
+                            />
+                          </div>
 
-                      {/* Thumbnail */}
-                      <div className="w-16 h-16 rounded-[8px] overflow-hidden bg-bg-secondary shrink-0">
-                        <img src={chapter.seriesImage || bundle.thumbnail} alt="" className="w-full h-full object-cover" />
+                          <div className="flex items-center gap-4">
+                            {chapter.duration && chapter.duration !== '1 PARTS' && (
+                              <span className={cn('type-tags', isGrayed ? 'text-text-tertiary' : 'text-text-secondary')}>
+                                {chapter.duration}
+                              </span>
+                            )}
+                            {isLocked && <span className="type-tags text-accent-magenta">Locked</span>}
+                            {isViewed && (
+                              <div className="flex items-center gap-1">
+                                <Check size={10} className="text-accent-green" strokeWidth={3} />
+                                <span className="type-tags text-accent-green">Viewed</span>
+                              </div>
+                            )}
+                            {hasSurvey && !isViewed && (
+                              <span className="type-tags text-text-tertiary">1 test</span>
+                            )}
+                          </div>
+
+                          <p className={cn(
+                            'type-body-default',
+                            isGrayed ? 'text-text-tertiary' : 'text-text-secondary'
+                          )}>
+                            {bundle.description.substring(0, 120)}...
+                          </p>
+                        </button>
                       </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <h4 className={cn('type-headline-small truncate', isViewed ? 'text-text-tertiary' : 'text-text-primary')}>
-                          {chapter.title}
-                        </h4>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          {chapter.duration && chapter.duration !== '1 PARTS' && (
-                            <span className="type-pre-text text-text-tertiary">{chapter.duration}</span>
-                          )}
-                          {chapter.durationMinutes > 0 && (
-                            <span className="type-pre-text text-text-tertiary">{chapter.durationMinutes} min</span>
-                          )}
-                          {hasSurvey && <span className="type-pre-text text-text-tertiary">· Quiz</span>}
-                          {isViewed && (
-                            <span className="flex items-center gap-1 type-pre-text text-accent-green">
-                              <Check size={10} strokeWidth={3} /> Viewed
-                            </span>
-                          )}
-                          {isLocked && <span className="type-pre-text text-accent-magenta">Locked</span>}
-                        </div>
-                      </div>
-
-                      <Heart size={18} className={cn(
-                        'shrink-0 opacity-0 group-hover:opacity-100 transition-opacity',
-                        done ? 'text-accent-magenta fill-accent-magenta opacity-100' : 'text-text-disabled'
-                      )} />
-                    </button>
+                      <div className="h-px bg-border-default" />
+                    </div>
                   );
                 })}
               </div>
             </div>
 
-            {/* RIGHT — Info cards (narrower) */}
+            {/* RIGHT — Info cards */}
             <div className="w-[300px] lg:w-[340px] shrink-0 flex flex-col gap-5">
 
               {/* About card */}
