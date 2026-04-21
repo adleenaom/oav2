@@ -271,9 +271,11 @@ export default function BundleDetail() {
 
                         {/* Meta */}
                         <div className="flex items-center gap-4">
-                          <span className={cn('type-tags', isGrayed ? 'text-text-tertiary' : 'text-text-secondary')}>
-                            {chapter.duration}
-                          </span>
+                          {chapter.duration && chapter.duration !== '1 PARTS' && (
+                            <span className={cn('type-tags', isGrayed ? 'text-text-tertiary' : 'text-text-secondary')}>
+                              {chapter.duration}
+                            </span>
+                          )}
                           {isLocked && <span className="type-tags text-accent-magenta">Locked</span>}
                           {isViewed && (
                             <div className="flex items-center gap-1">
@@ -438,7 +440,9 @@ export default function BundleDetail() {
                           <Heart size={20} className={done ? 'text-accent-magenta fill-accent-magenta' : 'text-text-disabled'} />
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="type-tags text-text-secondary">{chapter.duration}</span>
+                          {chapter.duration && chapter.duration !== '1 PARTS' && (
+                            <span className="type-tags text-text-secondary">{chapter.duration}</span>
+                          )}
                           {hasSurvey && <span className="type-tags text-text-tertiary">· Quiz</span>}
                           {isViewed && (
                             <span className="flex items-center gap-1 type-tags text-accent-green">

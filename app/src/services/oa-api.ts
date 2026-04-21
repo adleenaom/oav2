@@ -229,7 +229,7 @@ export async function getHomepageData() {
 
   // For Discover page: resolve ALL series in each bundle so we can show all chapter thumbnails
   // Group the fetched series by bundle, then fetch the full bundle to get all its series
-  let discoverBundles: { bundleId: number; bundleTitle: string; allSeries: OASeries[] }[] = [];
+  let discoverBundles: { bundleId: number; bundleTitle: string; bundleDescription: string; creditsRequired: number; durationMinutes: number; chapterCount: number; allSeries: OASeries[] }[] = [];
   try {
     const bundleIds = [...new Set(series.filter(s => s.bundle).map(s => s.bundle!.id))];
     if (bundleIds.length > 0) {
@@ -242,13 +242,29 @@ export async function getHomepageData() {
       for (const b of bundles) {
         const bSeriesIds = (b.series || []).map(s => s.id);
         const bSeries = allSeries.filter(s => bSeriesIds.includes(s.id));
-        discoverBundles.push({ bundleId: b.id, bundleTitle: b.title, allSeries: bSeries });
+        discoverBundles.push({
+          bundleId: b.id,
+          bundleTitle: b.title,
+          bundleDescription: b.description,
+          creditsRequired: b.creditsRequired,
+          durationMinutes: b.durationMinutes,
+          chapterCount: bSeriesIds.length,
+          allSeries: bSeries,
+        });
       }
     }
     // Add standalone series (no bundle)
     for (const s of series) {
       if (!s.bundle) {
-        discoverBundles.push({ bundleId: s.id, bundleTitle: s.title, allSeries: [s] });
+        discoverBundles.push({
+          bundleId: s.id,
+          bundleTitle: s.title,
+          bundleDescription: s.description || '',
+          creditsRequired: 0,
+          durationMinutes: 0,
+          chapterCount: 1,
+          allSeries: [s],
+        });
       }
     }
   } catch (e) { console.warn('Failed to resolve discover bundles:', e); }

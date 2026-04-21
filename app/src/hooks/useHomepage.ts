@@ -4,6 +4,10 @@ import { getHomepageData, type OADailyVideo, type OAPlan, type OASeries } from '
 export interface DiscoverBundle {
   bundleId: number;
   bundleTitle: string;
+  bundleDescription: string;
+  creditsRequired: number;
+  durationMinutes: number;
+  chapterCount: number;
   allSeries: OASeries[];
 }
 

@@ -331,21 +331,21 @@
   }
 }
 
-/* Hero section — extra generous top/bottom */
+/* Hero section — compact like Airbnb header */
 .section-hero {
   padding-top: var(--space-12);    /* 48px mobile */
   padding-bottom: var(--space-12);
 }
 @media (min-width: 768px) {
   .section-hero {
-    padding-top: var(--space-20);   /* 80px tablet */
-    padding-bottom: var(--space-20);
+    padding-top: var(--space-10);   /* 40px tablet */
+    padding-bottom: var(--space-10);
   }
 }
 @media (min-width: 1024px) {
   .section-hero {
-    padding-top: var(--space-24);   /* 96px desktop */
-    padding-bottom: var(--space-24);
+    padding-top: var(--space-10);   /* 40px desktop */
+    padding-bottom: var(--space-10);
   }
 }
 

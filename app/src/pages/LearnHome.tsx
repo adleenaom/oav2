@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SearchHeader from '../components/SearchHeader';
 import SectionHeader from '../components/SectionHeader';
@@ -15,6 +16,10 @@ export default function LearnHome() {
   const { forYou, plans, series, isLoading } = useHomepage();
   const { getPercentage, getContinueWatching, removeFromContinueWatching } = useProgress();
   const { modalBundle, closeModal } = useBundleNavigation();
+
+  const continueRef = useRef<HTMLDivElement>(null);
+  const forYouRef = useRef<HTMLDivElement>(null);
+  const lessonsRef = useRef<HTMLDivElement>(null);
 
   const continueWatching = getContinueWatching();
 
@@ -35,13 +40,13 @@ export default function LearnHome() {
           <SearchHeader />
         </div>
 
-        {/* Desktop hero */}
+        {/* Desktop hero — compact, full-width bg */}
         <div className="hidden md:block bg-bg-secondary">
           <div className="container-content section-hero">
-            <h1 className="text-[36px] lg:text-[40px] font-bold text-text-primary leading-tight font-sans">
+            <h1 className="text-[28px] lg:text-[32px] font-bold text-text-primary leading-tight font-sans">
               Start Learning
             </h1>
-            <p className="type-title-medium text-text-secondary mt-3 max-w-[480px]">
+            <p className="type-body-default text-text-secondary mt-1.5">
               Explore courses, watch videos, and track your progress
             </p>
           </div>
@@ -51,8 +56,8 @@ export default function LearnHome() {
         {continueWatching.length > 0 && (
           <div className="bg-bg-base section-tight">
             <div className="container-content">
-              <SectionHeader title="Continue Watching" onSeeAll={() => navigate('/viewall/continue')} />
-              <div className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
+              <SectionHeader title="Continue Watching" onSeeAll={() => navigate('/viewall/continue')} scrollRef={continueRef} />
+              <div ref={continueRef} className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
                 {continueWatching.map(item => {
                   const actions = [
                     { label: 'Remove', onClick: () => removeFromContinueWatching(item.id) },
@@ -81,8 +86,8 @@ export default function LearnHome() {
         {forYou.length > 0 && (
           <div className="bg-bg-base section-tight">
             <div className="container-content">
-              <SectionHeader title="For You" onSeeAll={() => navigate('/viewall/foryou')} />
-              <div className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
+              <SectionHeader title="For You" onSeeAll={() => navigate('/viewall/foryou')} scrollRef={forYouRef} />
+              <div ref={forYouRef} className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
                 {forYou.map((video, index) => (
                   <ForYouCard
                     key={video.id}
@@ -111,8 +116,8 @@ export default function LearnHome() {
         {plans.length > 0 && (
           <div className="bg-bg-base section-tight">
             <div className="container-content">
-              <SectionHeader title="Explore Lessons" onSeeAll={() => navigate('/viewall/lessons')} />
-              <div className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
+              <SectionHeader title="Explore Lessons" onSeeAll={() => navigate('/viewall/lessons')} scrollRef={lessonsRef} />
+              <div ref={lessonsRef} className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
                 {plans.map(plan => (
                   <LessonCard
                     key={plan.id}

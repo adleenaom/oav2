@@ -53,7 +53,9 @@ export default function BundleThumbnail({
   className = '',
   menuActions,
 }: BundleThumbnailProps) {
-  const { w, h } = sizeMap[size];
+  // If className provides its own sizing (e.g. w-full), skip default fixed sizes
+  const hasCustomSize = className.includes('w-full') || className.includes('w-[');
+  const { w, h } = hasCustomSize ? { w: '', h: '' } : sizeMap[size];
   const isNotStarted = progress === undefined || progress === 0;
   const isInProgress = progress !== undefined && progress > 0 && progress < 100;
   const isCompleted = progress === 100;

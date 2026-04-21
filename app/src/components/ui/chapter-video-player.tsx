@@ -18,6 +18,7 @@ import { X, Pause, Play, Volume2, VolumeX, Settings, Subtitles } from "lucide-re
 
 interface ChapterVideoPlayerProps {
   videoUrl: string
+  posterImage?: string
   bundleTitle: string
   chapterTitle: string
   partNumber: number
@@ -33,6 +34,7 @@ const CC_OPTIONS = ['Off', 'English', '中文', 'Bahasa Melayu'] as const
 
 function ChapterVideoPlayer({
   videoUrl,
+  posterImage,
   bundleTitle,
   chapterTitle,
   partNumber,
@@ -45,6 +47,7 @@ function ChapterVideoPlayer({
   const videoRef = React.useRef<HTMLVideoElement>(null)
   const progressRef = React.useRef<HTMLDivElement>(null)
   const [isPlaying, setIsPlaying] = React.useState(true)
+  const [videoError, setVideoError] = React.useState(false)
   const [isMuted, setIsMuted] = React.useState(false)
   const [currentTime, setCurrentTime] = React.useState(0)
   const [duration, setDuration] = React.useState(0)
@@ -99,6 +102,7 @@ function ChapterVideoPlayer({
         if (data.fatal) {
           console.warn('HLS fatal error — video may require session auth')
           setIsPlaying(false)
+          setVideoError(true)
         }
       })
     } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -346,15 +350,32 @@ function ChapterVideoPlayer({
             }
           `}</style>
           <div data-chapter-video-container="" className="relative w-full h-full">
+            {/* Poster image behind video */}
+            {posterImage && (
+              <img src={posterImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            )}
             <video
               ref={videoRef}
               className="absolute inset-0 w-full h-full object-cover"
               playsInline
+              poster={posterImage}
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
               onEnded={onEnded}
               onClick={togglePlay}
             />
+            {/* Video unavailable overlay */}
+            {videoError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-20 px-6">
+                <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mb-4">
+                  <Play size={24} className="text-white/50 ml-1" />
+                </div>
+                <p className="type-headline-medium text-white text-center mb-2">Video unavailable</p>
+                <p className="type-description text-white/50 text-center max-w-[260px]">
+                  This video requires authentication from the native app. It will be available once the backend enables web streaming.
+                </p>
+              </div>
+            )}
             {controlsOverlay}
           </div>
         </div>

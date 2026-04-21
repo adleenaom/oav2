@@ -1,9 +1,11 @@
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import BundleThumbnail from '../components/BundleThumbnail';
 import LessonCard from '../components/LessonCard';
 import { useHomepage } from '../hooks/useHomepage';
 import { useProgress } from '../hooks/useProgress';
+import { getLearnListings, getDailyVideos, type OADailyVideo } from '../services/oa-api';
 
 type ViewType = 'continue' | 'foryou' | 'lessons';
 
@@ -13,16 +15,52 @@ const titles: Record<ViewType, string> = {
   lessons: 'Explore Lessons',
 };
 
+/** Dedicated hook for ForYou videos — independent of useHomepage */
+function useForYouVideos() {
+  const [videos, setVideos] = useState<OADailyVideo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const listings = await getLearnListings(20);
+        const ids = (listings.forYou || []).map(r => r.id);
+        const resolved = ids.length > 0 ? await getDailyVideos(ids) : [];
+        if (!cancelled) setVideos(resolved);
+      } catch (e) {
+        console.warn('Failed to load ForYou videos:', e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  return { videos, loading };
+}
+
 export default function ViewAll() {
   const { type } = useParams<{ type: string }>();
   const navigate = useNavigate();
   const { getPercentage, getContinueWatching, removeFromContinueWatching } = useProgress();
-  const { forYou, plans } = useHomepage();
+  const { plans, isLoading: homepageLoading } = useHomepage();
+  const { videos: forYou, loading: forYouLoading } = useForYouVideos();
 
   const viewType = (type as ViewType) || 'foryou';
   const title = titles[viewType] || 'View All';
 
   const continueWatching = getContinueWatching();
+
+  const isLoading = viewType === 'foryou' ? forYouLoading : homepageLoading;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="type-body-default text-text-tertiary">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-bg-base">
@@ -124,51 +162,60 @@ export default function ViewAll() {
         </div>
 
         <div className="container-content section-tight">
-          {/* Continue Watching — 2 col grid, responsive to 3-4 */}
+          {/* Continue Watching — responsive 3:4 grid */}
           {viewType === 'continue' && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 card-grid-gap">
-              {continueWatching.map(item => {
-                const actions = [
-                  { label: 'Remove', onClick: () => removeFromContinueWatching(item.id) },
-                ];
-                if (item.planId) {
-                  actions.push({ label: 'Go to lessons', onClick: () => navigate(`/lesson/${item.planId}`) });
-                }
-                return (
-                  <BundleThumbnail
-                    key={`${item.type}-${item.id}`}
-                    thumbnail={item.thumbnail}
-                    alt={item.chapterTitle}
-                    size="big"
-                    progress={item.percentage}
-                    onClick={() => navigate(item.type === 'lesson' ? `/lesson/${item.id}` : `/bundle/${item.id}`)}
-                    className="w-full h-auto aspect-[3/4]"
-                    menuActions={actions}
-                  />
-                );
-              })}
-            </div>
-          )}
-
-          {/* For You — 2 col grid, responsive to 4-6 */}
-          {viewType === 'foryou' && (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 card-grid-gap">
-              {forYou.map((video, index) => (
-                <BundleThumbnail
-                  key={video.id}
-                  thumbnail={video.video?.image || ''}
-                  alt={video.title}
-                  size="big"
-                  onClick={() => navigate(`/foryou/${index}`)}
-                  className="w-full h-auto aspect-[3/4]"
-                />
+            <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {continueWatching.map(item => (
+                <button
+                  key={`${item.type}-${item.id}`}
+                  onClick={() => navigate(item.type === 'lesson' ? `/lesson/${item.id}` : `/bundle/${item.id}`)}
+                  className="card-interactive relative aspect-[3/4] rounded-[8px] overflow-hidden"
+                >
+                  <img src={item.thumbnail} alt={item.chapterTitle} className="absolute inset-0 w-full h-full object-cover" />
+                  {item.percentage > 0 && item.percentage < 100 && (
+                    <>
+                      <div className="absolute inset-0 bg-black/30" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="type-headline-medium text-text-on-dark">{item.percentage}%</span>
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 h-[7px]">
+                        <div className="bg-accent-blue h-full" style={{ width: `${item.percentage}%` }} />
+                      </div>
+                    </>
+                  )}
+                </button>
               ))}
             </div>
           )}
 
-          {/* Lessons — 1 column, max-width for readability */}
+          {/* For You — responsive 9:16 vertical video grid */}
+          {viewType === 'foryou' && (
+            <>
+              {forYou.length > 0 ? (
+                <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {forYou.map((video, index) => (
+                    <button
+                      key={video.id}
+                      onClick={() => navigate(`/foryou/${index}`)}
+                      className="card-interactive relative aspect-[9/16] rounded-[12px] overflow-hidden bg-bg-secondary"
+                    >
+                      <img src={video.video?.image || ''} alt={video.title} className="absolute inset-0 w-full h-full object-cover" />
+                      <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-3">
+                        <p className="type-description text-white font-semibold line-clamp-2">{video.title}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="type-body-default text-text-tertiary text-center py-12">No videos available</p>
+              )}
+            </>
+          )}
+
+          {/* Lessons — responsive card grid */}
           {viewType === 'lessons' && (
-            <div className="flex flex-col gap-6 max-w-[720px]">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {plans.map(plan => (
                 <LessonCard
                   key={plan.id}

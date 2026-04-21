@@ -1,17 +1,47 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search as SearchIcon } from 'lucide-react';
 import SectionHeader from '../components/SectionHeader';
 import LessonCard from '../components/LessonCard';
 import BundleThumbnail from '../components/BundleThumbnail';
-import { useHomepage } from '../hooks/useHomepage';
+import PurchaseModal from '../components/PurchaseModal';
+import { useHomepage, type DiscoverBundle } from '../hooks/useHomepage';
+import { useCredits } from '../hooks/useCredits';
 import { apiPost } from '../services/api';
 import { getSeries } from '../services/oa-api';
+import type { ApiBundleSummary } from '../services/types';
 
 export default function Discover() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const { plans, discoverBundles } = useHomepage();
+  const { isBundleAccessible } = useCredits();
+  const lessonsScrollRef = useRef<HTMLDivElement>(null);
+  const bundleScrollRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const [modalBundle, setModalBundle] = useState<ApiBundleSummary | null>(null);
+
+  /** Handle clicking a bundle section — modal if locked, navigate if accessible */
+  const handleBundleClick = (db: DiscoverBundle) => {
+    const isFree = db.creditsRequired === 0;
+    if (isBundleAccessible(db.bundleId, isFree)) {
+      navigate(`/bundle/${db.bundleId}`);
+    } else {
+      setModalBundle({
+        id: db.bundleId,
+        plan_id: null,
+        title: db.bundleTitle,
+        subtitle: '',
+        description: db.bundleDescription,
+        category: '',
+        credits_required: db.creditsRequired,
+        duration_minutes: db.durationMinutes,
+        is_free: isFree,
+        thumbnail: db.allSeries[0]?.image || '',
+        chapter_count: db.chapterCount,
+        creator: null,
+      });
+    }
+  };
 
   // Search — uses /v3/listings/learn-search or /v3/bundles/search
   const [searchResults, setSearchResults] = useState<{ plans: any[]; bundles: any[]; creators: any[] } | null>(null);
@@ -58,8 +88,8 @@ export default function Discover() {
         {/* Desktop header */}
         <div className="hidden md:block bg-bg-secondary">
           <div className="container-content section-hero">
-            <h1 className="text-[36px] lg:text-[40px] font-bold text-text-primary leading-tight font-sans">Discover</h1>
-            <div className="relative max-w-[480px] mt-3">
+            <h1 className="text-[28px] lg:text-[32px] font-bold text-text-primary leading-tight font-sans">Discover</h1>
+            <div className="relative max-w-[480px] mt-2">
               <SearchIcon size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary" />
               <input
                 type="text"
@@ -102,8 +132,8 @@ export default function Discover() {
             {plans.length > 0 && (
               <div className="bg-bg-base section-tight">
                 <div className="container-content">
-                  <SectionHeader title="Lessons" onSeeAll={() => navigate('/viewall/lessons')} />
-                  <div className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
+                  <SectionHeader title="Lessons" onSeeAll={() => navigate('/viewall/lessons')} scrollRef={lessonsScrollRef} />
+                  <div ref={lessonsScrollRef} className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
                     {plans.map(plan => (
                       <LessonCard
                         key={plan.id}
@@ -128,17 +158,19 @@ export default function Discover() {
             {discoverBundles.map(db => (
               <div key={db.bundleId} className="bg-bg-base section-tight">
                 <div className="container-content">
-                  <button
-                    onClick={() => navigate(`/bundle/${db.bundleId}`)}
-                    className="type-headline-medium text-text-primary text-left hover:underline"
+                  <SectionHeader
+                    title={db.bundleTitle}
+                    onSeeAll={() => handleBundleClick(db)}
+                    scrollRef={{ current: bundleScrollRefs.current[db.bundleId] }}
+                  />
+                  <div
+                    ref={el => { bundleScrollRefs.current[db.bundleId] = el; }}
+                    className="flex gap-2 overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0"
                   >
-                    {db.bundleTitle}
-                  </button>
-                  <div className="flex gap-2 overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
                     {db.allSeries.map(s => (
                       <button
                         key={s.id}
-                        onClick={() => navigate(`/bundle/${db.bundleId}`)}
+                        onClick={() => handleBundleClick(db)}
                         className="card-interactive relative w-[120px] h-[160px] md:w-[150px] md:h-[200px] rounded-[8px] overflow-hidden shrink-0"
                       >
                         <img src={s.image} alt={s.title} className="absolute inset-0 w-full h-full object-cover" />
@@ -153,6 +185,15 @@ export default function Discover() {
 
         <div className="hidden md:block h-20" />
       </div>
+
+      {/* Purchase modal — bottom sheet on mobile, centered modal on desktop */}
+      {modalBundle && (
+        <PurchaseModal
+          bundle={modalBundle}
+          isOpen={true}
+          onClose={() => setModalBundle(null)}
+        />
+      )}
     </div>
   );
 }

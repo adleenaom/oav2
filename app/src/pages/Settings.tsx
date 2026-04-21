@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, User, Lock, Bell, FileText, HelpCircle, Trash2, CreditCard, Gift, Share2, UserPlus, Mail } from 'lucide-react';
+import { ChevronLeft, ChevronRight, User, Lock, Bell, FileText, HelpCircle, Trash2, CreditCard, Gift, Share2, Mail } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Settings() {
@@ -21,13 +21,6 @@ export default function Settings() {
         { icon: CreditCard, label: 'Top Up Credits', path: '/subscription' },
         { icon: Gift, label: 'Redeem Gift Code', path: '/redeem' },
         { icon: Share2, label: 'Invite Friends', path: '/referral' },
-      ],
-    },
-    {
-      title: 'Content',
-      items: [
-        { icon: FileText, label: 'Magazine', path: '/magazine' },
-        { icon: UserPlus, label: 'Become a Creator', path: '/become-creator' },
       ],
     },
     {

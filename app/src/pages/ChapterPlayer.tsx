@@ -199,6 +199,7 @@ export default function ChapterPlayer() {
         {playerState === 'playing' && (
           <ChapterVideoPlayer
             videoUrl={currentChapter.videoUrl}
+            posterImage={currentChapter.videoImage}
             bundleTitle={bundle.title}
             chapterTitle={currentChapter.title}
             partNumber={currentIdx + 1}

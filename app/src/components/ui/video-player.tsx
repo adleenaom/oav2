@@ -6,11 +6,12 @@ import {
   ChevronUp,
   ChevronDown,
   Heart,
-  MessageCircle,
   Share2,
   ChevronLeft,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useLikes } from "@/hooks/useLikes"
+import ShareModal from "@/components/ShareModal"
 
 /* ============================================
  * VideoPlayer — YouTube Shorts-style centered layout
@@ -144,8 +145,10 @@ function VideoPlayer({
   const [currentIndex, setCurrentIndex] = React.useState(initialIndex)
   const [isPlaying, setIsPlaying] = React.useState(true)
   const [showControls, setShowControls] = React.useState(false)
+  const [showShare, setShowShare] = React.useState(false)
   const videoRef = React.useRef<HTMLVideoElement>(null)
   const controlsTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined)
+  const { isLiked, toggleLike } = useLikes()
 
   // Touch state
   const touchStartY = React.useRef(0)
@@ -228,6 +231,34 @@ function VideoPlayer({
     if (hasNext) goNext()
   }, [hasNext, goNext])
 
+  const handleLike = React.useCallback(() => {
+    if (!currentVideo) return
+    toggleLike({
+      id: currentVideo.id as number,
+      title: currentVideo.fullTitle || currentVideo.title,
+      thumbnail: currentVideo.thumbnail || '',
+    })
+  }, [currentVideo, toggleLike])
+
+  const handleShare = React.useCallback(async () => {
+    if (!currentVideo) return
+    const shareUrl = `${window.location.origin}/foryou/${currentIndex}`
+    const shareTitle = currentVideo.fullTitle || currentVideo.title
+
+    // Try native share first (works on mobile)
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: shareTitle, url: shareUrl })
+        return
+      } catch {
+        // User cancelled or not supported — fall through to modal
+      }
+    }
+    setShowShare(true)
+  }, [currentVideo, currentIndex])
+
+  const videoLiked = currentVideo ? isLiked(currentVideo.id as number) : false
+
   if (!currentVideo) return null
 
   return (
@@ -286,9 +317,8 @@ function VideoPlayer({
               <img src={currentVideo.thumbnail} alt="" className="size-full object-cover" />
             )}
           </div>
-          <ActionButton icon={Heart} label="Like" />
-          <ActionButton icon={MessageCircle} label="Comment" />
-          <ActionButton icon={Share2} label="Share" />
+          <ActionButton icon={Heart} label="Like" active={videoLiked} onClick={handleLike} />
+          <ActionButton icon={Share2} label="Share" onClick={handleShare} />
         </div>
 
         {/* Bottom info — px-4 pb-8, right padding clears action rail */}
@@ -380,12 +410,19 @@ function VideoPlayer({
 
           {/* Action buttons */}
           <div className="flex flex-col items-center gap-4">
-            <ActionButton icon={Heart} label="Like" />
-            <ActionButton icon={MessageCircle} label="Comment" />
-            <ActionButton icon={Share2} label="Share" />
+            <ActionButton icon={Heart} label="Like" active={videoLiked} onClick={handleLike} />
+            <ActionButton icon={Share2} label="Share" onClick={handleShare} />
           </div>
         </div>
       </div>
+
+      {/* Share modal */}
+      <ShareModal
+        isOpen={showShare}
+        onClose={() => setShowShare(false)}
+        title={currentVideo.fullTitle || currentVideo.title}
+        url={`${window.location.origin}/foryou/${currentIndex}`}
+      />
     </div>
   )
 }
