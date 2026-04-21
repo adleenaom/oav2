@@ -47,23 +47,24 @@ function proxyRequest(req, res, upstreamPath) {
   req.on('end', () => {
     const body = Buffer.concat(chunks);
 
+    const forwardHeaders = { ...req.headers };
+    delete forwardHeaders['host'];
+    delete forwardHeaders['connection'];
+    delete forwardHeaders['content-length'];
+    delete forwardHeaders['transfer-encoding']; // fixes 400 from Coolify's chunked forwarding
+    delete forwardHeaders['accept-encoding'];   // avoids br/zstd responses the proxy can't decompress
+
     const options = {
       hostname: UPSTREAM_HOST,
       port: 443,
       path: upstreamPath,
       method: req.method,
       headers: {
-        ...req.headers,
+        ...forwardHeaders,
         host: UPSTREAM_HOST,
+        'content-length': body.length,
       },
     };
-
-    // Remove headers that shouldn't be forwarded
-    delete options.headers['connection'];
-    delete options.headers['host']; // We set it above
-    if (body.length > 0) {
-      options.headers['content-length'] = body.length;
-    }
 
     const proxyReq = https.request(options, (proxyRes) => {
       res.writeHead(proxyRes.statusCode, proxyRes.headers);
