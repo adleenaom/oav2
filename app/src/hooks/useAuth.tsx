@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { apiFetch, setToken, clearToken } from '../services/api';
+import { apiPost, apiFetch, setAuth, clearAuth } from '../services/api';
 
 // ============================================
 // Types
@@ -41,51 +41,136 @@ export function useAuth(): AuthContextValue {
 // Provider
 // ============================================
 
+function getDeviceId(): string {
+  return localStorage.getItem('oa_device_id') || 'pwa-unknown';
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check existing token on mount
+  // Check existing token on mount — ping the API
   useEffect(() => {
     const token = localStorage.getItem('oa_auth_token');
-    if (!token) {
+    const userId = localStorage.getItem('oa_auth_user_id');
+    if (!token || !userId) {
       setIsLoading(false);
       return;
     }
-    apiFetch<AuthUser>('/auth/me')
-      .then(u => { setUser(u); setIsLoading(false); })
-      .catch(() => { clearToken(); setIsLoading(false); });
+    // Fetch profile to verify token is still valid
+    apiPost<{ credits: number; name?: string; email?: string }>('/v3/profile/home', {})
+      .then(res => {
+        setUser({
+          id: parseInt(userId),
+          name: res.name || 'User',
+          email: res.email || '',
+          avatar: '',
+          credits: res.credits || 0,
+          role: 'user',
+        });
+        setIsLoading(false);
+      })
+      .catch(() => {
+        clearAuth();
+        setIsLoading(false);
+      });
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const res = await apiFetch<{ token: string; user: AuthUser }>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
+    const res = await apiPost<{
+      status?: number;
+      message?: string;
+      token: string;
+      user_id: number;
+      platform: string;
+    }>('/auth/login', {
+      email,
+      password,
+      device_id: getDeviceId(),
+      device_model: navigator.userAgent.substring(0, 50),
+      os_version: 'Web',
+      fcm_token: '',
     });
-    setToken(res.token);
-    setUser(res.user);
-    return res.user;
+
+    if (!res.token) {
+      throw new Error(res.message || 'Login failed');
+    }
+
+    setAuth(res.token, res.user_id);
+
+    const authUser: AuthUser = {
+      id: res.user_id,
+      name: email.split('@')[0],
+      email,
+      avatar: '',
+      credits: 0,
+      role: 'user',
+    };
+    setUser(authUser);
+
+    // Fetch profile for credits
+    try {
+      const profile = await apiPost<{ credits?: number; name?: string }>('/v3/profile/tokens', {});
+      authUser.credits = profile.credits || 0;
+      if (profile.name) authUser.name = profile.name;
+      setUser({ ...authUser });
+    } catch { /* ignore */ }
+
+    return authUser;
   }, []);
 
   const register = useCallback(async (name: string, email: string, password: string) => {
-    const res = await apiFetch<{ token: string; user: AuthUser }>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ name, email, password }),
+    const res = await apiPost<{
+      status?: number;
+      message?: string;
+      token: string;
+      user_id: number;
+      platform: string;
+    }>('/guest/register', {
+      data: { name, email, password, password_confirmation: password },
+      platform: 'email',
+      token: '',
+      tag_ids: [],
+      learning_goal_id: '',
+      enable_notification: false,
+      device_id: getDeviceId(),
+      device_model: navigator.userAgent.substring(0, 50),
+      os_version: 'Web',
     });
-    setToken(res.token);
-    setUser(res.user);
-    return res.user;
+
+    if (!res.token) {
+      throw new Error(res.message || 'Registration failed');
+    }
+
+    setAuth(res.token, res.user_id);
+
+    const authUser: AuthUser = {
+      id: res.user_id,
+      name,
+      email,
+      avatar: '',
+      credits: 0,
+      role: 'user',
+    };
+    setUser(authUser);
+    return authUser;
   }, []);
 
   const logout = useCallback(() => {
-    clearToken();
+    // Call logout endpoint (fire and forget)
+    apiFetch('/auth/logout').catch(() => {});
+    clearAuth();
     setUser(null);
   }, []);
 
   const refreshUser = useCallback(async () => {
     try {
-      const u = await apiFetch<AuthUser>('/auth/me');
-      setUser(u);
+      const profile = await apiPost<{ credits?: number; name?: string; email?: string }>('/v3/profile/tokens', {});
+      setUser(prev => prev ? {
+        ...prev,
+        credits: profile.credits || prev.credits,
+        name: profile.name || prev.name,
+      } : null);
     } catch { /* ignore */ }
   }, []);
 
@@ -104,5 +189,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Re-export createElement for the provider JSX
 export { AuthContext };

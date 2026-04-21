@@ -245,63 +245,36 @@ export default function LessonDetail() {
                 <h2 className="type-display-medium text-text-primary">Lesson Bundles</h2>
               </div>
 
-              {lesson.bundles.map((bundle, idx) => {
-                const bundleProgress = getPercentage(String(bundle.id));
-                const isLocked = idx > 0 && getPercentage(String(lesson.bundles[idx - 1].id)) < 100;
-                return (
-                  <div key={bundle.id}>
-                    <button
-                      onClick={() => !isLocked && navigate(`/bundle/${bundle.id}`)}
-                      className={cn('w-full text-left px-6 py-5 flex flex-col gap-3', isLocked && 'opacity-50')}
-                    >
-                      {/* Thumbnail */}
-                      <div className="w-full h-[160px] rounded-[12px] overflow-hidden relative">
-                        <img src={bundle.thumbnail} alt={bundle.title} className="w-full h-full object-cover" />
-                        {bundleProgress > 0 && (
-                          <div className="absolute bottom-0 left-0 right-0 h-1.5 flex">
-                            <div className="bg-accent-blue h-full" style={{ width: `${bundleProgress}%` }} />
-                            <div className="bg-white/40 h-full flex-1" />
-                          </div>
-                        )}
-                      </div>
+              {lesson.bundles.map((bundle) => (
+                <div key={bundle.id} className="px-6 py-5 flex flex-col gap-3">
+                  {/* Subtitle + title + description */}
+                  <span className="type-tags text-text-primary">{bundle.subtitle}</span>
+                  <h3 className="type-display-medium text-text-secondary">{bundle.title}</h3>
+                  <p className="type-body-default text-text-secondary line-clamp-2">{bundle.description}</p>
 
-                      <div className="flex items-center justify-between">
-                        <span className="type-tags text-text-category">{bundle.subtitle}</span>
-                        {bundle.isFree ? (
-                          <span className="type-tags text-accent-green">FREE</span>
-                        ) : (
-                          <div className="flex items-center gap-0.5">
-                            <div className="w-2.5 h-2.5 rounded-full bg-accent-yellow" />
-                            <span className="type-tags text-text-primary">{bundle.price}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <h3 className="type-headline-medium text-text-primary">{bundle.title}</h3>
-                      <p className="type-description text-text-secondary line-clamp-2">{bundle.description}</p>
-
-                      <div className="flex items-center gap-3">
-                        <span className="type-tags text-text-secondary">{bundle.chapters.length} chapters</span>
-                        <span className="type-tags text-text-tertiary">· {bundle.totalMinutes} min</span>
-                        {bundleProgress > 0 && <span className="type-tags text-accent-blue">· {bundleProgress}%</span>}
-                      </div>
-
-                      {/* Get this bundle CTA */}
-                      <div className="bg-action-primary rounded flex items-center justify-center gap-1 px-4 py-3 w-full mt-1">
-                        <span className="type-button text-text-on-dark">Get this bundle</span>
-                        {!bundle.isFree && (
-                          <>
-                            <span className="text-white/40 mx-0.5">|</span>
-                            <div className="w-3.5 h-3.5 rounded-full bg-accent-yellow" />
-                            <span className="type-button text-text-on-dark">{bundle.price}</span>
-                          </>
-                        )}
-                      </div>
-                    </button>
-                    <div className="h-px bg-border-default" />
+                  {/* Meta */}
+                  <div className="flex items-center gap-2 type-tags text-text-secondary">
+                    <span>{bundle.chapterCount || 0} chapters</span>
+                    <span>•</span>
+                    <span>{bundle.totalMinutes} mins</span>
                   </div>
-                );
-              })}
+
+                  {/* ChaptersRow — horizontal scrollable thumbnails */}
+                  <ChaptersRow bundleId={bundle.id} size="small" />
+
+                  {/* CTA */}
+                  <OAButton
+                    variant="blue"
+                    size="medium"
+                    fullWidth
+                    onClick={() => navigate(`/bundle/${bundle.id}`)}
+                  >
+                    {bundle.isFree ? 'Start Bundle' : `Get this bundle | 🪙 ${bundle.price}`}
+                  </OAButton>
+
+                  <div className="h-px bg-border-default mt-2" />
+                </div>
+              ))}
             </div>
           )}
 

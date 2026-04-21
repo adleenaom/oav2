@@ -1,26 +1,35 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Play, Lock } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Play, Lock, X } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { useProgress } from '../hooks/useProgress';
 import { useCredits } from '../hooks/useCredits';
 import OAButton from '../components/OAButton';
 import BundleThumbnail from '../components/BundleThumbnail';
-import type { ApiBundleDetail } from '../services/types';
+import { ChapterVideoPlayer } from '@/components/ui/chapter-video-player';
+import type { ApiBundleDetail, ApiPlanDetail } from '../services/types';
 
-type PlayerState = 'playing' | 'up-next' | 'end-of-bundle' | 'locked';
+type PlayerState = 'playing' | 'up-next' | 'end-of-bundle' | 'next-bundle' | 'locked';
 
 export default function ChapterPlayer() {
   const { bundleId, chapterIndex } = useParams<{ bundleId: string; chapterIndex: string }>();
   const navigate = useNavigate();
   const { trackChapterWatch, markChapterComplete, resetChapterProgress, getBundleProgress } = useProgress();
-  const { credits, purchaseBundle } = useCredits();
+  const { credits, purchaseBundle, isBundleAccessible } = useCredits();
 
   const { data: bundle } = useApi<ApiBundleDetail>(bundleId ? `/bundles/${bundleId}` : null);
+  const { data: parentPlan } = useApi<ApiPlanDetail>(bundle?.plan_id ? `/plans/${bundle.plan_id}` : null);
   const { data: recommendations } = useApi<{ id: number; title: string; thumbnail: string; category: string; is_free: boolean; credits_required: number }[]>(
     bundleId ? `/recommendations/similar/${bundleId}` : null
   );
+
+  // Find next bundle in lesson plan
+  const planBundles = parentPlan?.bundles ?? [];
+  const currentBundleIdx = planBundles.findIndex(b => b.id === Number(bundleId));
+  const nextPlanBundle = currentBundleIdx >= 0 && currentBundleIdx < planBundles.length - 1
+    ? planBundles[currentBundleIdx + 1] : null;
+  const nextBundleAccessible = nextPlanBundle
+    ? isBundleAccessible(nextPlanBundle.id, nextPlanBundle.is_free) : false;
 
   const chapters = bundle?.series?.flatMap(s => s.chapters) ?? [];
   const [currentIdx, setCurrentIdx] = useState(parseInt(chapterIndex || '0', 10));
@@ -30,8 +39,6 @@ export default function ChapterPlayer() {
   const [purchaseError, setPurchaseError] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const touchStartY = useRef(0);
-  const touchEndY = useRef(0);
   const countdownRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   const currentChapter = chapters[currentIdx];
@@ -58,33 +65,7 @@ export default function ChapterPlayer() {
     }, 300);
   }, [chapters.length, isTransitioning]);
 
-  // ---- Swipe handling ----
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY;
-    touchEndY.current = e.touches[0].clientY;
-  }, []);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    touchEndY.current = e.touches[0].clientY;
-  }, []);
-
-  const handleTouchEnd = useCallback(() => {
-    const diff = touchStartY.current - touchEndY.current;
-    if (diff > 60) {
-      // Swipe up → skip to next part/chapter
-      if (playerState === 'playing') {
-        if (hasNext) {
-          goToChapter(currentIdx + 1);
-        } else {
-          setPlayerState('end-of-bundle');
-        }
-      }
-    } else if (diff < -60) {
-      // Swipe down → go back
-      if (currentIdx > 0) goToChapter(currentIdx - 1);
-    }
-  }, [playerState, hasNext, currentIdx, goToChapter]);
+  // Swipe/keyboard navigation now handled by ChapterVideoPlayer internally
 
   // ---- Keyboard (desktop) ----
 
@@ -161,9 +142,27 @@ export default function ChapterPlayer() {
         });
       }, 1000);
     } else {
-      setPlayerState('end-of-bundle');
+      // End of bundle — check if lesson plan has a next bundle
+      if (nextPlanBundle && nextBundleAccessible) {
+        setPlayerState('next-bundle');
+        setCountdown(5);
+        countdownRef.current = setInterval(() => {
+          setCountdown(prev => {
+            if (prev <= 1) {
+              clearInterval(countdownRef.current);
+              navigate(`/play/${nextPlanBundle.id}/0`);
+              return 5;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else if (nextPlanBundle && !nextBundleAccessible) {
+        setPlayerState('locked');
+      } else {
+        setPlayerState('end-of-bundle');
+      }
     }
-  }, [currentChapter, bundle, hasNext, currentIdx, markChapterComplete, goToChapter]);
+  }, [currentChapter, bundle, hasNext, currentIdx, markChapterComplete, goToChapter, nextPlanBundle, nextBundleAccessible, navigate]);
 
   // Cleanup countdown on unmount
   useEffect(() => () => clearInterval(countdownRef.current), []);
@@ -194,44 +193,21 @@ export default function ChapterPlayer() {
   return (
     <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
 
-      {/* ---- Mobile: full-screen ---- */}
-      <div
-        className="md:hidden relative w-full h-full"
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        {/* Video */}
+      {/* ---- Video Player (mobile + desktop) ---- */}
+      <div className="relative w-full h-full">
+        {/* ChapterVideoPlayer replaces raw <video> */}
         {playerState === 'playing' && (
-          <div className={cn(
-            'absolute inset-0 transition-transform duration-300',
-            isTransitioning ? '-translate-y-full' : 'translate-y-0'
-          )}>
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              src={getVideoUrl(currentChapter)}
-              playsInline
-              onEnded={handleVideoEnded}
-            />
-            <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
-
-            {/* Top bar */}
-            <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-4 pt-14 pb-3">
-              <button onClick={() => navigate(-1)} className="bg-black/50 rounded-lg px-3 py-2 flex items-center gap-1.5">
-                <ChevronLeft size={13} className="text-white" />
-                <span className="type-button text-white">Back</span>
-              </button>
-              <span className="type-tags text-white/60">{currentIdx + 1}/{chapters.length}</span>
-            </div>
-
-            {/* Bottom info */}
-            <div className="absolute inset-x-0 bottom-0 z-10 px-6 pb-8">
-              <p className="type-tags text-white/50 mb-1">{bundle.category}</p>
-              <p className="type-headline-medium text-white">{currentChapter.title}</p>
-              <p className="type-description text-white/60 mt-1">{currentChapter.duration}</p>
-            </div>
-          </div>
+          <ChapterVideoPlayer
+            videoUrl={getVideoUrl(currentChapter)}
+            bundleTitle={bundle.title}
+            chapterTitle={currentChapter.title}
+            partNumber={currentIdx + 1}
+            totalParts={chapters.length}
+            duration={currentChapter.duration}
+            skipTimestamp={5}
+            onClose={() => navigate(-1)}
+            onEnded={handleVideoEnded}
+          />
         )}
 
         {/* Up Next screen */}
@@ -289,11 +265,70 @@ export default function ChapterPlayer() {
           </div>
         )}
 
+        {/* Next Bundle autoplay screen (lesson plan flow) */}
+        {playerState === 'next-bundle' && nextPlanBundle && (
+          <div className="absolute inset-0">
+            {/* Blurred background thumbnail */}
+            <img src={nextPlanBundle.thumbnail} alt="" className="absolute inset-0 w-full h-full object-cover blur-[8px] scale-110" />
+            <div className="absolute inset-0 bg-black/60" />
+
+            {/* Content overlay */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center px-6 gap-4 z-10">
+              {/* Top info */}
+              <div className="absolute top-14 left-6 right-6 flex justify-between">
+                <div>
+                  <p className="type-display-medium text-white italic">{bundle.title}</p>
+                  <p className="type-description text-white/50">Part {currentBundleIdx + 1} of {planBundles.length}</p>
+                </div>
+                <button onClick={() => navigate(-1)} className="text-white">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <p className="type-description text-white/50">Up Next</p>
+              <h2 className="type-headline-large text-white text-center">{nextPlanBundle.title}</h2>
+              <p className="type-description text-white/50 text-center max-w-[300px]">
+                {nextPlanBundle.description}
+              </p>
+
+              {/* Countdown play button */}
+              <button
+                onClick={() => { clearInterval(countdownRef.current); navigate(`/play/${nextPlanBundle.id}/0`); }}
+                className="relative w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mt-4"
+              >
+                <svg className="absolute inset-0 w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+                  <circle cx="40" cy="40" r="36" stroke="white" strokeOpacity="0.2" strokeWidth="3" fill="none" />
+                  <circle cx="40" cy="40" r="36" stroke="white" strokeWidth="3" fill="none"
+                    strokeDasharray={`${((5 - countdown) / 5) * 226} 226`} strokeLinecap="round" />
+                </svg>
+                <Play size={28} className="text-white fill-white ml-1" />
+                <span className="absolute -bottom-6 type-description text-white/40">{countdown}s</span>
+              </button>
+
+              {/* Action buttons */}
+              <div className="flex gap-4 mt-8 w-full max-w-[320px]">
+                <button
+                  onClick={() => { clearInterval(countdownRef.current); navigate(`/bundle/${bundleId}`); }}
+                  className="flex-1 py-3 rounded-[8px] bg-white/10 type-button text-white text-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { clearInterval(countdownRef.current); navigate(`/play/${nextPlanBundle.id}/0`); }}
+                  className="flex-1 py-3 rounded-[8px] bg-action-secondary type-button text-white text-center"
+                >
+                  Play Now
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Locked screen (lesson plan — next bundle not purchased) */}
         {playerState === 'locked' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center px-6 gap-6">
             <Lock size={48} className="text-accent-magenta" />
-            <p className="type-headline-large text-white text-center">This bundle is locked</p>
+            <p className="type-headline-large text-white text-center">{nextPlanBundle ? nextPlanBundle.title : 'Next bundle'} is locked</p>
             <p className="type-description text-white/50 text-center">Purchase this bundle to continue your lesson plan.</p>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-accent-yellow" />
@@ -308,111 +343,7 @@ export default function ChapterPlayer() {
         )}
       </div>
 
-      {/* ---- Desktop: centered vertical video ---- */}
-      <div className="hidden md:flex items-center justify-center w-full h-full gap-6">
-        <div className="w-16 shrink-0" />
-
-        {/* Video container */}
-        <div
-          className="relative bg-black rounded-2xl overflow-hidden shrink-0"
-          style={{
-            width: 'min(380px, calc((100vh - 96px) * 9 / 16))',
-            height: 'min(calc(100vh - 96px), calc(380px * 16 / 9))',
-          }}
-        >
-          {playerState === 'playing' && (
-            <div className={cn(
-              'absolute inset-0 transition-transform duration-300',
-              isTransitioning ? '-translate-y-full' : 'translate-y-0'
-            )}>
-              <video
-                ref={videoRef}
-                className="w-full h-full object-cover"
-                src={getVideoUrl(currentChapter)}
-                playsInline
-                onEnded={handleVideoEnded}
-              />
-              <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
-
-              {/* Top bar */}
-              <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between p-4">
-                <button onClick={() => navigate(-1)} className="bg-black/50 rounded-lg px-3 py-1.5 flex items-center gap-1">
-                  <ChevronLeft size={12} className="text-white" />
-                  <span className="type-button text-white text-[10px]">Back</span>
-                </button>
-                <span className="type-tags text-white/60">{currentIdx + 1}/{chapters.length}</span>
-              </div>
-
-              {/* Bottom info */}
-              <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-4">
-                <p className="type-tags text-white/50 mb-1">{bundle.category}</p>
-                <p className="type-headline-small text-white">{currentChapter.title}</p>
-                <p className="type-pre-text text-white/50 mt-0.5">{currentChapter.duration}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Up Next overlay */}
-          {playerState === 'up-next' && hasNext && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center px-6 gap-4">
-              <p className="type-tags text-white/50">UP NEXT</p>
-              <p className="type-headline-medium text-white text-center">{chapters[currentIdx + 1].title}</p>
-              <button
-                onClick={() => { clearInterval(countdownRef.current); goToChapter(currentIdx + 1); }}
-                className="relative w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mt-2"
-              >
-                <svg className="absolute inset-0 w-16 h-16 -rotate-90" viewBox="0 0 64 64">
-                  <circle cx="32" cy="32" r="28" stroke="white" strokeOpacity="0.2" strokeWidth="3" fill="none" />
-                  <circle cx="32" cy="32" r="28" stroke="white" strokeWidth="3" fill="none"
-                    strokeDasharray={`${((5 - countdown) / 5) * 176} 176`} strokeLinecap="round" />
-                </svg>
-                <Play size={22} className="text-white fill-white ml-0.5" />
-              </button>
-              <p className="type-pre-text text-white/40">{countdown}s</p>
-            </div>
-          )}
-
-          {/* End of bundle overlay */}
-          {playerState === 'end-of-bundle' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center px-4 gap-4">
-              <p className="type-tags text-accent-green">COMPLETE</p>
-              <p className="type-headline-small text-white text-center">{bundle.title}</p>
-              <OAButton variant="blue" size="medium-compact" onClick={() => navigate(`/bundle/${bundleId}`)}>
-                Back to Bundle
-              </OAButton>
-            </div>
-          )}
-
-          {/* Locked overlay */}
-          {playerState === 'locked' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center px-4 gap-4">
-              <Lock size={32} className="text-accent-magenta" />
-              <p className="type-headline-small text-white text-center">Locked</p>
-              <OAButton variant="primary" size="medium-compact" onClick={handlePurchase}>Unlock</OAButton>
-            </div>
-          )}
-        </div>
-
-        {/* Right side — nav + info */}
-        <div className="flex flex-col items-center justify-center gap-4 w-16 shrink-0">
-          <button
-            onClick={() => currentIdx > 0 && goToChapter(currentIdx - 1)}
-            className={cn('w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white', currentIdx === 0 && 'opacity-30')}
-          >
-            <ChevronLeft size={16} className="rotate-90" />
-          </button>
-          <span className="type-tags text-white/40 tabular-nums">{currentIdx + 1}/{chapters.length}</span>
-          <button
-            onClick={() => {
-              if (hasNext) goToChapter(currentIdx + 1);
-              else setPlayerState('end-of-bundle');
-            }}
-            className={cn('w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white')}
-          >
-            <ChevronLeft size={16} className="-rotate-90" />
-          </button>
-        </div>
-      </div>
+      {/* Desktop uses the same ChapterVideoPlayer — it's full-screen on all devices */}
     </div>
   );
 }

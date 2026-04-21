@@ -1,4 +1,50 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+/**
+ * API client for OpenAcademy existing Laravel API.
+ *
+ * Production: https://app.theopenacademy.org/api/
+ * All endpoints are POST under /v3/ prefix.
+ * Auth uses Z-TOKEN + Z-USER headers (not JWT Bearer).
+ */
+
+// Production (Coolify): nginx proxies /v3/, /auth/, /guest/ to theopenacademy.org → API_BASE = ''
+// Local dev: direct to the API (may have CORS issues in browser, use proxy or test via curl)
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
+// ---- Device ID (generated once, persisted) ----
+
+function getDeviceId(): string {
+  let id = localStorage.getItem('oa_device_id');
+  if (!id) {
+    id = 'pwa-' + crypto.randomUUID();
+    localStorage.setItem('oa_device_id', id);
+  }
+  return id;
+}
+
+// ---- Token storage ----
+
+const TOKEN_KEY = 'oa_auth_token';
+const USER_ID_KEY = 'oa_auth_user_id';
+
+function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+function getUserId(): string | null {
+  return localStorage.getItem(USER_ID_KEY);
+}
+
+export function setAuth(token: string, userId: number) {
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_ID_KEY, String(userId));
+}
+
+export function clearAuth() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_ID_KEY);
+}
+
+// ---- Error ----
 
 export class ApiError extends Error {
   status: number;
@@ -10,27 +56,29 @@ export class ApiError extends Error {
   }
 }
 
-function getToken(): string | null {
-  return localStorage.getItem('oa_auth_token');
-}
-
-export function setToken(token: string) {
-  localStorage.setItem('oa_auth_token', token);
-}
-
-export function clearToken() {
-  localStorage.removeItem('oa_auth_token');
-}
+// ---- Core fetch ----
 
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getToken();
+  const userId = getUserId();
+
+  const headers: Record<string, string> = {
+    'accept': 'application/json',
+    'content-type': 'application/json',
+    'Z-PLATFORM': 'web',
+    'Z-VERSION': '1.0.0',
+    'Z-DEVICEID': getDeviceId(),
+    ...((options?.headers as Record<string, string>) || {}),
+  };
+
+  if (token && userId) {
+    headers['Z-TOKEN'] = token;
+    headers['Z-USER'] = userId;
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
+    headers,
   });
 
   if (!res.ok) {
@@ -42,5 +90,20 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   return res.json();
 }
 
-/** SWR-compatible fetcher */
-export const fetcher = <T>(path: string) => apiFetch<T>(path);
+/**
+ * POST to v3 endpoint (all existing API endpoints are POST).
+ */
+export async function apiPost<T>(path: string, body: Record<string, unknown> = {}): Promise<T> {
+  return apiFetch<T>(path, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** SWR-compatible fetcher — uses POST for /v3/ endpoints */
+export const fetcher = <T>(path: string) => {
+  if (path.startsWith('/v3/')) {
+    return apiPost<T>(path);
+  }
+  return apiFetch<T>(path);
+};

@@ -1,59 +1,43 @@
 import { useCallback } from 'react';
-import { useApi } from './useApi';
-import { apiFetch } from '../services/api';
-
-interface CreditsData {
-  credits: number;
-}
-
-interface PurchasesData {
-  bundle_ids: number[];
-  plan_ids: number[];
-}
+import { useAuth } from './useAuth';
+import { apiPost } from '../services/api';
 
 export function useCredits() {
-  const { data: creditsData, mutate: mutateCredits } = useApi<CreditsData>('/credits');
-  const { data: purchasesData, mutate: mutatePurchases } = useApi<PurchasesData>('/credits/purchases');
+  const { user, refreshUser } = useAuth();
 
-  const credits = creditsData?.credits ?? 1000;
-  const purchasedBundleIds = purchasesData?.bundle_ids ?? [];
-  const purchasedPlanIds = purchasesData?.plan_ids ?? [];
+  const credits = user?.credits ?? 0;
 
   const purchaseBundle = useCallback(async (bundleId: number): Promise<boolean> => {
     try {
-      await apiFetch('/credits/purchase', {
-        method: 'POST',
-        body: JSON.stringify({ bundle_id: bundleId }),
-      });
-      mutateCredits();
-      mutatePurchases();
+      await apiPost('/v3/bundles/purchase', { bundle_id: bundleId });
+      await refreshUser();
       return true;
     } catch {
       return false;
     }
-  }, [mutateCredits, mutatePurchases]);
+  }, [refreshUser]);
 
   const purchasePlan = useCallback(async (planId: number): Promise<boolean> => {
     try {
-      await apiFetch('/credits/purchase', {
-        method: 'POST',
-        body: JSON.stringify({ plan_id: planId }),
-      });
-      mutateCredits();
-      mutatePurchases();
+      await apiPost('/v3/plans/purchase', { plan_id: planId });
+      await refreshUser();
       return true;
     } catch {
       return false;
     }
-  }, [mutateCredits, mutatePurchases]);
+  }, [refreshUser]);
 
-  const isBundlePurchased = useCallback((bundleId: number): boolean => {
-    return purchasedBundleIds.includes(bundleId);
-  }, [purchasedBundleIds]);
+  // For now, purchased status is tracked locally until we wire engagement-status endpoints
+  const purchasedBundleIds: number[] = [];
+  const purchasedPlanIds: number[] = [];
 
-  const isBundleAccessible = useCallback((bundleId: number, isFree: boolean): boolean => {
-    return isFree || purchasedBundleIds.includes(bundleId);
-  }, [purchasedBundleIds]);
+  const isBundlePurchased = useCallback((_bundleId: number): boolean => {
+    return false; // TODO: wire to /v3/bundles/engagement-status
+  }, []);
+
+  const isBundleAccessible = useCallback((_bundleId: number, isFree: boolean): boolean => {
+    return isFree; // TODO: wire to engagement-status for owned bundles
+  }, []);
 
   return {
     credits,

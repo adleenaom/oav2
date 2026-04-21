@@ -43,7 +43,7 @@ export default function PurchaseModal({ bundle, isOpen, onClose }: PurchaseModal
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center" onClick={handleClose}>
+    <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center" onClick={handleClose}>
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50" />
 
@@ -51,13 +51,15 @@ export default function PurchaseModal({ bundle, isOpen, onClose }: PurchaseModal
       <div
         onClick={e => e.stopPropagation()}
         className={cn(
-          'relative bg-bg-base rounded-t-[24px] md:rounded-[24px] w-full md:max-w-[420px] max-h-[85vh] overflow-y-auto',
+          'relative bg-bg-base rounded-t-[24px] md:rounded-[24px] w-full md:max-w-[420px] max-h-[85vh] flex flex-col',
           'animate-in slide-in-from-bottom duration-300'
         )}
       >
         {/* ---- Overview state ---- */}
         {state === 'overview' && (
-          <div className="flex flex-col">
+          <div className="flex flex-col flex-1 min-h-0">
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto">
             {/* Header */}
             <div className="flex items-center justify-between p-6 pb-0">
               <span className="type-tags text-text-category">{bundle.category}</span>
@@ -98,8 +100,10 @@ export default function PurchaseModal({ bundle, isOpen, onClose }: PurchaseModal
               </div>
             )}
 
-            {/* CTA */}
-            <div className="p-6 pt-2">
+            </div>{/* end scrollable content */}
+
+            {/* CTA — sticky at bottom */}
+            <div className="p-6 pt-4 border-t border-border-default shrink-0 bg-bg-base rounded-b-[24px]">
               {!canAfford && (
                 <p className="type-description text-accent-magenta text-center mb-3">
                   Not enough credits ({credits} available, {bundle.credits_required} needed)
