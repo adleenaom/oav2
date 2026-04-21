@@ -12,12 +12,10 @@ RUN npm run build
 
 FROM nginx:alpine
 
-# Install ca-certificates for HTTPS proxy
 RUN apk add --no-cache ca-certificates
 
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Write nginx config with proper upstream proxy settings
 RUN cat > /etc/nginx/conf.d/default.conf << 'NGINXEOF'
 server {
     listen 80;
@@ -26,9 +24,10 @@ server {
     index index.html;
     client_max_body_size 10m;
 
-    # DNS resolver for dynamic upstream resolution
     resolver 8.8.8.8 8.8.4.4 valid=30s ipv6=off;
     resolver_timeout 5s;
+
+    set $backend https://app.theopenacademy.org;
 
     location / {
         try_files $uri $uri/ /index.html;
@@ -40,8 +39,8 @@ server {
     }
 
     location /v3/ {
-        set $upstream https://app.theopenacademy.org;
-        proxy_pass $upstream/api/v3/;
+        rewrite ^/v3/(.*)$ /api/v3/$1 break;
+        proxy_pass $backend;
         proxy_set_header Host app.theopenacademy.org;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -53,8 +52,8 @@ server {
     }
 
     location /auth/ {
-        set $upstream https://app.theopenacademy.org;
-        proxy_pass $upstream/api/auth/;
+        rewrite ^/auth/(.*)$ /api/auth/$1 break;
+        proxy_pass $backend;
         proxy_set_header Host app.theopenacademy.org;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -66,8 +65,8 @@ server {
     }
 
     location /guest/ {
-        set $upstream https://app.theopenacademy.org;
-        proxy_pass $upstream/api/guest/;
+        rewrite ^/guest/(.*)$ /api/guest/$1 break;
+        proxy_pass $backend;
         proxy_set_header Host app.theopenacademy.org;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -79,8 +78,8 @@ server {
     }
 
     location /media/ {
-        set $upstream https://app.theopenacademy.org;
-        proxy_pass $upstream/media/;
+        rewrite ^/media/(.*)$ /media/$1 break;
+        proxy_pass $backend;
         proxy_set_header Host app.theopenacademy.org;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
