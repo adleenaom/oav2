@@ -338,12 +338,10 @@ export default function BundleDetail() {
 
         {/* Hero header — blurred background + title + action bar */}
         <div className="relative w-full overflow-hidden">
-          {/* Blurred bg image */}
           <img src={bundle.thumbnail} alt="" className="absolute inset-0 w-full h-full object-cover scale-110 blur-[20px] brightness-[0.4]" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-black/70" />
 
-          {/* Content overlay */}
-          <div className="relative z-10 px-8 lg:px-12 pt-6 pb-8 flex flex-col justify-end" style={{ minHeight: '300px' }}>
+          <div className="container-content relative z-10 flex flex-col justify-end pt-6 pb-8" style={{ minHeight: '300px' }}>
             <Breadcrumb items={[
               { label: 'Home', path: '/' },
               ...(bundle.planId ? [{ label: 'Lesson', path: `/lesson/${bundle.planId}` }] : []),
@@ -364,23 +362,17 @@ export default function BundleDetail() {
               )}
             </div>
 
-            {/* Action bar inside hero */}
+            {/* Action bar */}
             <div className="flex items-center gap-4 mt-6">
-              <OAButton
-                variant={hasAccess ? 'blue' : 'primary'}
-                size="medium"
-                onClick={handleCTA}
-              >
+              <OAButton variant={hasAccess ? 'blue' : 'primary'} size="medium" onClick={handleCTA}>
                 {ctaLabel}
               </OAButton>
-
               <button className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors">
                 <Heart size={18} className="text-white" />
               </button>
               <button className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors">
                 <Share2 size={18} className="text-white" />
               </button>
-
               {!hasAccess && (
                 <div className="flex items-center gap-1.5 ml-auto">
                   <div className="w-4 h-4 rounded-full bg-accent-yellow" />
@@ -398,80 +390,78 @@ export default function BundleDetail() {
           </div>
         </div>
 
-        {/* Two-column body — full width padding matching hero */}
-        <div className="px-8 lg:px-12 py-8">
+        {/* Two-column body */}
+        <div className="container-content section">
           <div className="flex gap-10 lg:gap-14">
 
-            {/* LEFT — Chapter listing (reuses mobile pattern) */}
+            {/* LEFT — Chapter cards with thumbnails */}
             <div className="flex-1 min-w-0">
               <h2 className="type-headline-large text-text-primary mb-5">Chapters ({bundle.chapters.length})</h2>
-              <div className="flex flex-col">
+              <div className="flex flex-col gap-4">
                 {bundle.chapters.map((chapter, idx) => {
                   const chId = String(chapter.id);
                   const done = completedChapters.includes(chId);
                   const isLocked = !hasAccess && idx > 0;
                   const hasSurvey = chapter.hasAssessment;
                   const isViewed = done;
-                  const isGrayed = isViewed;
+                  const isGrayed = isViewed || isLocked;
 
                   return (
-                    <div key={chapter.id}>
-                      <div className={cn('py-4 flex flex-col gap-4')}>
-                        <button
-                          onClick={() => !isLocked && handlePlayChapter(chId)}
-                          className="flex flex-col gap-4 text-left w-full"
-                          disabled={isLocked}
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="flex-1 flex items-center gap-4 min-w-0">
-                              <h3 className={cn(
-                                'type-display-medium truncate',
-                                isGrayed ? 'text-text-tertiary' : 'text-text-primary'
-                              )}>
-                                {chapter.title}
-                              </h3>
-                              <ChevronRight size={12} className={cn(
-                                'shrink-0',
-                                isGrayed ? 'text-text-tertiary' : 'text-text-secondary'
-                              )} />
-                            </div>
-                            <Heart
-                              size={24}
-                              className={cn(
-                                done ? 'text-accent-magenta fill-accent-magenta'
-                                  : 'text-text-tertiary'
-                              )}
-                            />
-                          </div>
-
-                          <div className="flex items-center gap-4">
-                            {chapter.duration && chapter.duration !== '1 PARTS' && (
-                              <span className={cn('type-tags', isGrayed ? 'text-text-tertiary' : 'text-text-secondary')}>
-                                {chapter.duration}
-                              </span>
-                            )}
-                            {isLocked && <span className="type-tags text-accent-magenta">Locked</span>}
-                            {isViewed && (
-                              <div className="flex items-center gap-1">
-                                <Check size={10} className="text-accent-green" strokeWidth={3} />
-                                <span className="type-tags text-accent-green">Viewed</span>
-                              </div>
-                            )}
-                            {hasSurvey && !isViewed && (
-                              <span className="type-tags text-text-tertiary">1 test</span>
-                            )}
-                          </div>
-
-                          <p className={cn(
-                            'type-body-default',
-                            isGrayed ? 'text-text-tertiary' : 'text-text-secondary'
-                          )}>
-                            {bundle.description.substring(0, 120)}...
-                          </p>
-                        </button>
+                    <button
+                      key={chapter.id}
+                      onClick={() => !isLocked && handlePlayChapter(chId)}
+                      disabled={isLocked}
+                      className={cn(
+                        'flex gap-5 p-6 rounded-[16px] text-left w-full transition-colors',
+                        isLocked ? 'opacity-50 bg-bg-secondary' : 'bg-bg-secondary hover:bg-gray-4/20'
+                      )}
+                    >
+                      {/* Thumbnail */}
+                      <div className="w-[100px] h-[133px] rounded-[8px] overflow-hidden bg-bg-base shrink-0">
+                        <img src={chapter.seriesImage || bundle.thumbnail} alt="" className="w-full h-full object-cover" />
                       </div>
-                      <div className="h-px bg-border-default" />
-                    </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0 flex flex-col gap-3">
+                        <div className="flex items-center gap-4">
+                          <h3 className={cn(
+                            'type-display-medium truncate flex-1',
+                            isGrayed ? 'text-text-tertiary' : 'text-text-primary'
+                          )}>
+                            {chapter.title}
+                          </h3>
+                          <Heart size={24} className={cn(
+                            'shrink-0',
+                            done ? 'text-accent-magenta fill-accent-magenta' : 'text-text-tertiary'
+                          )} />
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                          {chapter.duration && chapter.duration !== '1 PARTS' && (
+                            <span className={cn('type-tags', isGrayed ? 'text-text-tertiary' : 'text-text-secondary')}>
+                              {chapter.duration}
+                            </span>
+                          )}
+                          {isLocked && <span className="type-tags text-accent-magenta">Locked</span>}
+                          {isViewed && (
+                            <div className="flex items-center gap-1">
+                              <Check size={10} className="text-accent-green" strokeWidth={3} />
+                              <span className="type-tags text-accent-green">Viewed</span>
+                            </div>
+                          )}
+                          {hasSurvey && !isViewed && (
+                            <span className="type-tags text-text-tertiary">1 test</span>
+                          )}
+                        </div>
+
+                        <p className={cn(
+                          'type-body-default line-clamp-2',
+                          isGrayed ? 'text-text-tertiary' : 'text-text-secondary'
+                        )}>
+                          {bundle.description.substring(0, 120)}...
+                        </p>
+                      </div>
+                    </button>
                   );
                 })}
               </div>
@@ -479,14 +469,11 @@ export default function BundleDetail() {
 
             {/* RIGHT — Info cards */}
             <div className="w-[300px] lg:w-[340px] shrink-0 flex flex-col gap-5">
-
-              {/* About card */}
               <div className="bg-bg-secondary rounded-[16px] p-6">
                 <h3 className="type-headline-small text-text-primary mb-3">About</h3>
                 <p className="type-body-default text-text-secondary">{bundle.description}</p>
               </div>
 
-              {/* Progress card */}
               {percentage > 0 && (
                 <div className="bg-bg-secondary rounded-[16px] p-6">
                   <h3 className="type-headline-small text-text-primary mb-4">Progress</h3>
@@ -499,14 +486,13 @@ export default function BundleDetail() {
                       <span className="absolute inset-0 flex items-center justify-center type-pre-text font-bold text-text-primary">{percentage}%</span>
                     </div>
                     <div>
-                      <p className="type-description font-semibold text-text-primary">{completedChapters.length} of {bundle.chapters.length} chapters</p>
+                      <p className="type-description font-semibold text-text-primary">{completedChapters.length} of {bundle.chapters.length}</p>
                       <p className="type-pre-text text-text-tertiary">{isCompleted ? 'All done!' : 'Keep going!'}</p>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Resources card */}
               <div className="bg-bg-secondary rounded-[16px] p-6">
                 <h3 className="type-headline-small text-text-primary mb-3">Resources</h3>
                 <div className="flex flex-col gap-1">
@@ -521,7 +507,6 @@ export default function BundleDetail() {
                 </div>
               </div>
 
-              {/* Creator card */}
               {bundle.creator && (
                 <div className="bg-bg-secondary rounded-[16px] p-6">
                   <h3 className="type-headline-small text-text-primary mb-3">Creator</h3>
@@ -535,7 +520,6 @@ export default function BundleDetail() {
                 </div>
               )}
 
-              {/* Lesson plan link card */}
               {parentLesson && (
                 <button
                   onClick={() => navigate(`/lesson/${parentLesson.id}`)}
