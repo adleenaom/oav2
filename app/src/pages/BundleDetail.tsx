@@ -337,8 +337,10 @@ export default function BundleDetail() {
       <div className="hidden md:flex flex-col flex-1 overflow-y-auto">
 
         {/* Hero header — blurred background + title + action bar */}
-        <div className="relative w-full overflow-hidden">
-          <img src={bundle.thumbnail} alt="" className="absolute inset-0 w-full h-full object-cover scale-110 blur-[20px] brightness-[0.4]" />
+        <div className="relative w-full overflow-hidden bg-[#1a1a2e]">
+          {(bundle.thumbnail || bundle.chapters[0]?.seriesImage) && (
+            <img src={bundle.thumbnail || bundle.chapters[0]?.seriesImage} alt="" className="absolute inset-0 w-full h-full object-cover scale-110 blur-[20px] brightness-[0.4]" />
+          )}
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-black/70" />
 
           <div className="container-content relative z-10 flex flex-col justify-end pt-6 pb-8" style={{ minHeight: '300px' }}>
