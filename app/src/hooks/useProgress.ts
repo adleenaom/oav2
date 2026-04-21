@@ -35,6 +35,7 @@ export interface ForYouProgress {
 interface ProgressStore {
   bundles: Record<string, BundleProgress>;
   foryou: Record<string, ForYouProgress>;
+  hiddenFromContinue?: string[];  // bundle/plan IDs hidden from Continue Watching
 }
 
 const STORAGE_KEY = 'oa_progress_v2';
@@ -42,7 +43,7 @@ const STORAGE_KEY = 'oa_progress_v2';
 function load(): ProgressStore {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : { bundles: {}, foryou: {} };
+    return raw ? JSON.parse(raw) : { bundles: {}, foryou: {}, hiddenFromContinue: [] };
   } catch {
     return { bundles: {}, foryou: {} };
   }
@@ -147,17 +148,30 @@ export function useProgress() {
     return Math.round((p.completedChapters.length / p.totalChapters) * 100);
   }, [store]);
 
+  /** Remove an item from Continue Watching without deleting progress */
+  const removeFromContinueWatching = useCallback((id: string) => {
+    setStore(prev => {
+      const hidden = [...(prev.hiddenFromContinue || []), id];
+      const next: ProgressStore = { ...prev, hiddenFromContinue: hidden };
+      save(next);
+      return next;
+    });
+  }, []);
+
   /**
    * Continue Watching list:
-   * - Standalone bundles (planId = null) with progress, not 100% complete
+   * - Only shows items with actual mid-watch progress (not 100% complete)
+   * - Standalone bundles (planId = null) with progress
    * - Lesson plans: find unique planIds from bundles with progress, aggregate
+   * - Items hidden via removeFromContinueWatching are excluded
    * - Each item has the last watched chapter's thumbnail
    */
   const getContinueWatching = useCallback((): Array<{
     id: string;
     type: 'bundle' | 'lesson';
+    planId: string | null;
     title: string;
-    thumbnail: string;         // last watched chapter thumbnail
+    thumbnail: string;
     chapterTitle: string;
     percentage: number;
     lastWatchedAt: number;
@@ -165,6 +179,7 @@ export function useProgress() {
     const items: Array<{
       id: string;
       type: 'bundle' | 'lesson';
+      planId: string | null;
       title: string;
       thumbnail: string;
       chapterTitle: string;
@@ -172,16 +187,19 @@ export function useProgress() {
       lastWatchedAt: number;
     }> = [];
 
+    const hidden = new Set(store.hiddenFromContinue || []);
     const allBundles = Object.values(store.bundles);
 
     // Standalone bundles (NOT part of a lesson)
     allBundles
       .filter(b => b.planId === null || b.planId === undefined)
       .filter(b => b.completedChapters.length > 0 && b.completedChapters.length < b.totalChapters)
+      .filter(b => !hidden.has(b.bundleId))
       .forEach(b => {
         items.push({
           id: b.bundleId,
           type: 'bundle',
+          planId: null,
           title: b.bundleTitle,
           thumbnail: b.lastChapterThumbnail,
           chapterTitle: b.lastChapterTitle,
@@ -200,6 +218,8 @@ export function useProgress() {
     }
 
     for (const [planId, bundles] of Object.entries(planGroups)) {
+      if (hidden.has(planId)) continue;
+
       const totalChapters = bundles.reduce((sum, b) => sum + b.totalChapters, 0);
       const completedChapters = bundles.reduce((sum, b) => sum + b.completedChapters.length, 0);
 
@@ -212,7 +232,8 @@ export function useProgress() {
       items.push({
         id: planId,
         type: 'lesson',
-        title: `Lesson Plan`, // We don't have the plan title in progress data — page will resolve
+        planId,
+        title: `Lesson Plan`,
         thumbnail: latest.lastChapterThumbnail,
         chapterTitle: latest.lastChapterTitle,
         percentage: Math.round((completedChapters / totalChapters) * 100),
@@ -253,6 +274,7 @@ export function useProgress() {
     trackChapterWatch,
     markChapterComplete,
     resetChapterProgress,
+    removeFromContinueWatching,
     getBundleProgress,
     getBundlePercentage,
     getContinueWatching,

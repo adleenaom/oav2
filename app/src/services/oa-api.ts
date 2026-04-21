@@ -85,6 +85,32 @@ export interface OACreator {
   updatedAt: number;
 }
 
+export interface OAChapter {
+  id: number;
+  seriesId: number;
+  title: string;
+  description: string;
+  duration: string;
+  seqNo: number;
+  isPremium: boolean;
+  contents: { id: number; type: string }[];
+  assessments: { id: number; type: string }[];
+  updatedAt: number;
+}
+
+export interface OAContent {
+  id: number;
+  seqNo: number;
+  chapterId: number;
+  seriesId: number;
+  type: string;
+  title: string;
+  ready: boolean;
+  video: OAVideo | null;
+  image: string;
+  updatedAt: number;
+}
+
 export interface OAListingRef {
   id: number;
   updatedAt: number;
@@ -133,6 +159,20 @@ export async function getBundles(ids: number[]) {
   return res.items || [];
 }
 
+/** Get full chapter objects by IDs */
+export async function getChapters(ids: number[]) {
+  if (ids.length === 0) return [];
+  const res = await apiPost<{ items: OAChapter[] }>('/v3/chapters/retrieve', { items: ids });
+  return res.items || [];
+}
+
+/** Get full content objects by IDs */
+export async function getContents(ids: number[]) {
+  if (ids.length === 0) return [];
+  const res = await apiPost<{ items: OAContent[] }>('/v3/contents/retrieve', { items: ids });
+  return res.items || [];
+}
+
 /** Get full creator objects by IDs */
 export async function getCreators(ids: number[]) {
   if (ids.length === 0) return [];
@@ -143,8 +183,8 @@ export async function getCreators(ids: number[]) {
 /** Get lessons (lesson plans) listing */
 export async function getLessonsListing(size = 10) {
   return apiPost<{
-    items: OAListingRef[];
-    total: number;
+    lessons: OAListingRef[];
+    suggested: OAListingRef[];
   }>('/v3/listings/lessons', { size });
 }
 
@@ -162,26 +202,62 @@ export async function getHomepageData() {
   const listings = await getLearnListings(10);
 
   // Resolve ForYou videos
-  const forYouIds = listings.forYou.map(r => r.id);
-  const forYouVideos = await getDailyVideos(forYouIds);
+  let forYouVideos: OADailyVideo[] = [];
+  try {
+    const forYouIds = (listings.forYou || []).map(r => r.id);
+    forYouVideos = await getDailyVideos(forYouIds);
+  } catch (e) { console.warn('Failed to load forYou:', e); }
 
   // Resolve lesson plan IDs
-  const lessonListing = await getLessonsListing(10);
-  const planIds = lessonListing.items.map(r => r.id);
-  const plans = planIds.length > 0 ? await getPlans(planIds) : [];
+  let plans: OAPlan[] = [];
+  try {
+    const lessonListing = await getLessonsListing(10);
+    const planIds = (lessonListing.lessons || []).map(r => r.id);
+    plans = planIds.length > 0 ? await getPlans(planIds) : [];
+  } catch (e) { console.warn('Failed to load plans:', e); }
 
   // Resolve trending/recommended series
-  const seriesIds = [
-    ...listings.recommended.filter(r => r.type === 'series').map(r => r.id),
-    ...listings.trending.filter(r => r.type === 'series').map(r => r.id),
-  ];
-  const uniqueSeriesIds = [...new Set(seriesIds)];
-  const series = uniqueSeriesIds.length > 0 ? await getSeries(uniqueSeriesIds) : [];
+  let series: OASeries[] = [];
+  try {
+    const seriesIds = [
+      ...(listings.recommended || []).filter(r => r.type === 'series').map(r => r.id),
+      ...(listings.trending || []).filter(r => r.type === 'series').map(r => r.id),
+    ];
+    const uniqueSeriesIds = [...new Set(seriesIds)];
+    series = uniqueSeriesIds.length > 0 ? await getSeries(uniqueSeriesIds) : [];
+  } catch (e) { console.warn('Failed to load series:', e); }
+
+  // For Discover page: resolve ALL series in each bundle so we can show all chapter thumbnails
+  // Group the fetched series by bundle, then fetch the full bundle to get all its series
+  let discoverBundles: { bundleId: number; bundleTitle: string; allSeries: OASeries[] }[] = [];
+  try {
+    const bundleIds = [...new Set(series.filter(s => s.bundle).map(s => s.bundle!.id))];
+    if (bundleIds.length > 0) {
+      const bundles = await getBundles(bundleIds);
+      // For each bundle, get ALL its series (not just the ones in the homepage listing)
+      const allSeriesIds = bundles.flatMap(b => (b.series || []).map(s => s.id));
+      const uniqueAllSeriesIds = [...new Set(allSeriesIds)];
+      const allSeries = uniqueAllSeriesIds.length > 0 ? await getSeries(uniqueAllSeriesIds) : [];
+
+      for (const b of bundles) {
+        const bSeriesIds = (b.series || []).map(s => s.id);
+        const bSeries = allSeries.filter(s => bSeriesIds.includes(s.id));
+        discoverBundles.push({ bundleId: b.id, bundleTitle: b.title, allSeries: bSeries });
+      }
+    }
+    // Add standalone series (no bundle)
+    for (const s of series) {
+      if (!s.bundle) {
+        discoverBundles.push({ bundleId: s.id, bundleTitle: s.title, allSeries: [s] });
+      }
+    }
+  } catch (e) { console.warn('Failed to resolve discover bundles:', e); }
 
   return {
     forYou: forYouVideos,
     plans,
     series,
+    discoverBundles,
     listings,
   };
 }

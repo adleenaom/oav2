@@ -1,5 +1,7 @@
 import * as React from "react"
+import Hls from "hls.js"
 import { cn } from "@/lib/utils"
+import { getAuthHeaders } from "@/services/api"
 import { X, Pause, Play, Volume2, VolumeX, Settings, Subtitles } from "lucide-react"
 
 /**
@@ -63,14 +65,63 @@ function ChapterVideoPlayer({
     }, 4000)
   }, [isDragging, showCCMenu])
 
-  // Play on mount
+  // HLS + play on mount
+  const hlsRef = React.useRef<Hls | null>(null)
+
   React.useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.play().catch(() => setIsPlaying(false))
+    const video = videoRef.current
+    if (!video || !videoUrl) return
+
+    // Cleanup previous HLS instance
+    if (hlsRef.current) {
+      hlsRef.current.destroy()
+      hlsRef.current = null
     }
+
+    const isHls = videoUrl.includes('.m3u8') || videoUrl.includes('playlist')
+
+    if (isHls && Hls.isSupported()) {
+      const authHeaders = getAuthHeaders()
+      const hls = new Hls({
+        xhrSetup: (xhr: XMLHttpRequest) => {
+          Object.entries(authHeaders).forEach(([key, value]) => {
+            xhr.setRequestHeader(key, value)
+          })
+        },
+      })
+      hlsRef.current = hls
+      hls.loadSource(videoUrl)
+      hls.attachMedia(video)
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(() => setIsPlaying(false))
+      })
+      hls.on(Hls.Events.ERROR, (_event: string, data: { fatal?: boolean }) => {
+        if (data.fatal) {
+          console.warn('HLS fatal error — video may require session auth')
+          setIsPlaying(false)
+        }
+      })
+    } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari native HLS
+      video.src = videoUrl
+      video.addEventListener('loadedmetadata', () => {
+        video.play().catch(() => setIsPlaying(false))
+      }, { once: true })
+    } else {
+      // Regular MP4
+      video.src = videoUrl
+      video.play().catch(() => setIsPlaying(false))
+    }
+
     resetControlsTimer()
-    return () => clearTimeout(controlsTimer.current)
-  }, [])
+    return () => {
+      clearTimeout(controlsTimer.current)
+      if (hlsRef.current) {
+        hlsRef.current.destroy()
+        hlsRef.current = null
+      }
+    }
+  }, [videoUrl])
 
   // Time update
   const handleTimeUpdate = React.useCallback(() => {
@@ -146,23 +197,9 @@ function ChapterVideoPlayer({
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
 
-  return (
-    <div
-      className={cn("fixed inset-0 z-[100] bg-black flex flex-col", className)}
-      onClick={resetControlsTimer}
-    >
-      {/* Video */}
-      <video
-        ref={videoRef}
-        className="absolute inset-0 w-full h-full object-cover"
-        src={videoUrl}
-        playsInline
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
-        onEnded={onEnded}
-        onClick={togglePlay}
-      />
-
+  // Shared controls overlay
+  const controlsOverlay = (
+    <>
       {/* Gradient overlays */}
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/80 to-transparent pointer-events-none" />
       <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
@@ -215,22 +252,18 @@ function ChapterVideoPlayer({
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}
           >
-            {/* Filled progress */}
             <div
               className="absolute h-full bg-accent-blue rounded-full"
               style={{ width: `${progress}%` }}
             />
-            {/* Section marker: intro end */}
             <div
               className="absolute w-0.5 h-4 -top-1 bg-accent-yellow rounded-full"
               style={{ left: `0%` }}
             />
-            {/* Section marker: skip point */}
             <div
               className="absolute w-0.5 h-4 -top-1 bg-white/70 rounded-full"
               style={{ left: `${duration > 0 ? (skipTimestamp / duration) * 100 : 15}%` }}
             />
-            {/* Thumb */}
             <div
               className="absolute w-3 h-3 -top-0.5 bg-white/0 rounded-full shadow-lg"
               style={{ left: `calc(${progress}% - 6px)` }}
@@ -240,7 +273,6 @@ function ChapterVideoPlayer({
 
         {/* Control buttons row */}
         <div className="flex items-center justify-between">
-          {/* Left: pause, volume, time */}
           <div className="flex items-center gap-3">
             <button onClick={togglePlay} className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
               {isPlaying ? <Pause size={16} className="text-white fill-white" /> : <Play size={16} className="text-white fill-white ml-0.5" />}
@@ -253,7 +285,6 @@ function ChapterVideoPlayer({
             </span>
           </div>
 
-          {/* Right: speed, CC */}
           <div className="flex items-center gap-2 relative">
             <button onClick={cycleSpeed} className="h-9 rounded-full bg-white/20 flex items-center justify-center gap-1 px-3">
               <Settings size={14} className="text-white" />
@@ -263,7 +294,6 @@ function ChapterVideoPlayer({
               <Subtitles size={16} className={selectedCC !== 'Off' ? 'text-accent-blue' : 'text-white'} />
             </button>
 
-            {/* CC dropdown */}
             {showCCMenu && (
               <div className="absolute bottom-12 right-0 bg-bg-overlay/95 rounded-[12px] p-2 min-w-[160px] flex flex-col gap-1 z-20">
                 {CC_OPTIONS.map(opt => (
@@ -280,6 +310,52 @@ function ChapterVideoPlayer({
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+
+  return (
+    <div
+      className={cn("fixed inset-0 z-[100] bg-black flex items-center justify-center", className)}
+      onClick={resetControlsTimer}
+    >
+      {/* Video container — full-screen on mobile, centered 9:16 on desktop */}
+      <div
+        className="relative w-full h-full md:w-auto md:h-auto md:rounded-2xl md:overflow-hidden md:shrink-0"
+        style={{
+          // Desktop only: constrain to 9:16 aspect ratio
+        }}
+      >
+        {/* Desktop sizing wrapper */}
+        <div
+          className="relative w-full h-full"
+          style={{
+            // On desktop, these CSS custom properties constrain the size
+          }}
+        >
+          <style>{`
+            @media (min-width: 768px) {
+              [data-chapter-video-container] {
+                width: min(420px, calc((100vh - 64px) * 9 / 16)) !important;
+                height: min(calc(100vh - 64px), calc(420px * 16 / 9)) !important;
+                border-radius: 16px;
+                overflow: hidden;
+              }
+            }
+          `}</style>
+          <div data-chapter-video-container="" className="relative w-full h-full">
+            <video
+              ref={videoRef}
+              className="absolute inset-0 w-full h-full object-cover"
+              playsInline
+              onTimeUpdate={handleTimeUpdate}
+              onLoadedMetadata={handleLoadedMetadata}
+              onEnded={onEnded}
+              onClick={togglePlay}
+            />
+            {controlsOverlay}
           </div>
         </div>
       </div>

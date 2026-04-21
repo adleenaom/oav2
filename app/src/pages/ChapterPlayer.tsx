@@ -1,13 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Play, Lock, X } from 'lucide-react';
-import { useApi } from '../hooks/useApi';
+import { useBundleDetail, usePlanDetail } from '../hooks/useOAData';
 import { useProgress } from '../hooks/useProgress';
 import { useCredits } from '../hooks/useCredits';
 import OAButton from '../components/OAButton';
 import BundleThumbnail from '../components/BundleThumbnail';
 import { ChapterVideoPlayer } from '@/components/ui/chapter-video-player';
-import type { ApiBundleDetail, ApiPlanDetail } from '../services/types';
 
 type PlayerState = 'playing' | 'up-next' | 'end-of-bundle' | 'next-bundle' | 'locked';
 
@@ -17,21 +16,28 @@ export default function ChapterPlayer() {
   const { trackChapterWatch, markChapterComplete, resetChapterProgress, getBundleProgress } = useProgress();
   const { credits, purchaseBundle, isBundleAccessible } = useCredits();
 
-  const { data: bundle } = useApi<ApiBundleDetail>(bundleId ? `/bundles/${bundleId}` : null);
-  const { data: parentPlan } = useApi<ApiPlanDetail>(bundle?.plan_id ? `/plans/${bundle.plan_id}` : null);
-  const { data: recommendations } = useApi<{ id: number; title: string; thumbnail: string; category: string; is_free: boolean; credits_required: number }[]>(
-    bundleId ? `/recommendations/similar/${bundleId}` : null
-  );
+  const { bundle: oaBundle, seriesList, resolvedChapters } = useBundleDetail(bundleId ? Number(bundleId) : null);
+  const { planBundles: parentPlanBundles } = usePlanDetail(oaBundle?.plan?.id || null);
+
+  const bundle = oaBundle ? {
+    id: oaBundle.id,
+    title: oaBundle.title,
+    category: '',
+    plan_id: oaBundle.plan?.id || null,
+    thumbnail: seriesList[0]?.image || '',
+  } : null;
+
+  const recommendations: { id: number; title: string; thumbnail: string; category: string; is_free: boolean; credits_required: number }[] = [];
 
   // Find next bundle in lesson plan
-  const planBundles = parentPlan?.bundles ?? [];
+  const planBundles = parentPlanBundles;
   const currentBundleIdx = planBundles.findIndex(b => b.id === Number(bundleId));
   const nextPlanBundle = currentBundleIdx >= 0 && currentBundleIdx < planBundles.length - 1
     ? planBundles[currentBundleIdx + 1] : null;
   const nextBundleAccessible = nextPlanBundle
-    ? isBundleAccessible(nextPlanBundle.id, nextPlanBundle.is_free) : false;
+    ? isBundleAccessible(nextPlanBundle.id, nextPlanBundle.creditsRequired === 0) : false;
 
-  const chapters = bundle?.series?.flatMap(s => s.chapters) ?? [];
+  const chapters = resolvedChapters;
   const [currentIdx, setCurrentIdx] = useState(parseInt(chapterIndex || '0', 10));
   const [playerState, setPlayerState] = useState<PlayerState>('playing');
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -45,12 +51,6 @@ export default function ChapterPlayer() {
   const hasNext = currentIdx < chapters.length - 1;
   const progress = getBundleProgress(bundleId || '');
   const isCompleted = progress?.completedChapters?.includes(String(currentChapter?.id));
-
-  // Get video URL from chapter parts
-  const getVideoUrl = useCallback((ch: typeof chapters[0]) => {
-    const vp = ch?.parts?.find((p: { type: string }) => p.type === 'video');
-    return (vp as { url?: string })?.url || '';
-  }, []);
 
   // ---- Navigation with transition ----
 
@@ -108,7 +108,7 @@ export default function ChapterPlayer() {
       planId: bundle.plan_id ? String(bundle.plan_id) : null,
       totalChapters: chapters.length,
       chapterId: String(currentChapter.id),
-      chapterThumbnail: currentChapter.thumbnail || bundle.thumbnail,
+      chapterThumbnail: currentChapter.videoImage || currentChapter.seriesImage || bundle.thumbnail,
       chapterTitle: currentChapter.title,
     });
 
@@ -198,7 +198,7 @@ export default function ChapterPlayer() {
         {/* ChapterVideoPlayer replaces raw <video> */}
         {playerState === 'playing' && (
           <ChapterVideoPlayer
-            videoUrl={getVideoUrl(currentChapter)}
+            videoUrl={currentChapter.videoUrl}
             bundleTitle={bundle.title}
             chapterTitle={currentChapter.title}
             partNumber={currentIdx + 1}
@@ -269,7 +269,7 @@ export default function ChapterPlayer() {
         {playerState === 'next-bundle' && nextPlanBundle && (
           <div className="absolute inset-0">
             {/* Blurred background thumbnail */}
-            <img src={nextPlanBundle.thumbnail} alt="" className="absolute inset-0 w-full h-full object-cover blur-[8px] scale-110" />
+            <div className="absolute inset-0 bg-bg-overlay" />
             <div className="absolute inset-0 bg-black/60" />
 
             {/* Content overlay */}

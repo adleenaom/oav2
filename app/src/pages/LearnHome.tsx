@@ -4,26 +4,19 @@ import SectionHeader from '../components/SectionHeader';
 import BundleThumbnail from '../components/BundleThumbnail';
 import ForYouCard from '../components/ForYouCard';
 import LessonCard from '../components/LessonCard';
-import PromotionBanner from '../components/PromotionBanner';
 import OAButton from '../components/OAButton';
 import PurchaseModal from '../components/PurchaseModal';
-import { useApi } from '../hooks/useApi';
+import { useHomepage } from '../hooks/useHomepage';
 import { useProgress } from '../hooks/useProgress';
 import { useBundleNavigation } from '../hooks/useBundleNavigation';
-import type { ApiHomeListings } from '../services/types';
 
 export default function LearnHome() {
   const navigate = useNavigate();
-  const { data, isLoading } = useApi<ApiHomeListings>('/listings/home');
-  const { modalBundle, handleBundleClick, closeModal } = useBundleNavigation();
-  const { getPercentage, getContinueWatching } = useProgress();
+  const { forYou, plans, series, isLoading } = useHomepage();
+  const { getPercentage, getContinueWatching, removeFromContinueWatching } = useProgress();
+  const { modalBundle, closeModal } = useBundleNavigation();
 
   const continueWatching = getContinueWatching();
-
-  const forYouVideos = data?.for_you ?? [];
-  const standaloneBundles = data?.originals ?? [];
-  const lessonPlans = data?.lessons ?? [];
-  const banners = data?.banners ?? [];
 
   if (isLoading) {
     return (
@@ -60,42 +53,51 @@ export default function LearnHome() {
             <div className="container-content">
               <SectionHeader title="Continue Watching" onSeeAll={() => navigate('/viewall/continue')} />
               <div className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
-                {continueWatching.map(item => (
-                  <BundleThumbnail
-                    key={`${item.type}-${item.id}`}
-                    thumbnail={item.thumbnail}
-                    alt={item.chapterTitle}
-                    size="big"
-                    progress={item.percentage}
-                    onClick={() => navigate(item.type === 'lesson' ? `/lesson/${item.id}` : `/bundle/${item.id}`)}
-                  />
-                ))}
+                {continueWatching.map(item => {
+                  const actions = [
+                    { label: 'Remove', onClick: () => removeFromContinueWatching(item.id) },
+                  ];
+                  if (item.planId) {
+                    actions.push({ label: 'Go to lessons', onClick: () => navigate(`/lesson/${item.planId}`) });
+                  }
+                  return (
+                    <BundleThumbnail
+                      key={`${item.type}-${item.id}`}
+                      thumbnail={item.thumbnail}
+                      alt={item.chapterTitle}
+                      size="big"
+                      progress={item.percentage}
+                      onClick={() => navigate(item.type === 'lesson' ? `/lesson/${item.id}` : `/bundle/${item.id}`)}
+                      menuActions={actions}
+                    />
+                  );
+                })}
               </div>
             </div>
           </div>
         )}
 
         {/* For You */}
-        {forYouVideos.length > 0 && (
+        {forYou.length > 0 && (
           <div className="bg-bg-base section-tight">
             <div className="container-content">
               <SectionHeader title="For You" onSeeAll={() => navigate('/viewall/foryou')} />
               <div className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
-                {forYouVideos.map((video, index) => (
+                {forYou.map((video, index) => (
                   <ForYouCard
                     key={video.id}
                     video={{
                       id: video.id,
                       type: 'foryou',
                       title: video.title,
-                      fullTitle: video.full_title,
-                      category: video.category,
-                      description: video.description,
+                      fullTitle: video.title,
+                      category: '',
+                      description: '',
                       keywords: [],
-                      seriesCount: video.series_count,
-                      totalMinutes: video.total_minutes,
-                      thumbnail: video.thumbnail,
-                      videoUrl: video.video_url,
+                      seriesCount: 0,
+                      totalMinutes: video.video.durationMinutes,
+                      thumbnail: video.video.image,
+                      videoUrl: video.video.source,
                     }}
                     onClick={() => navigate(`/foryou/${index}`)}
                   />
@@ -106,12 +108,12 @@ export default function LearnHome() {
         )}
 
         {/* Explore Lessons */}
-        {lessonPlans.length > 0 && (
+        {plans.length > 0 && (
           <div className="bg-bg-base section-tight">
             <div className="container-content">
               <SectionHeader title="Explore Lessons" onSeeAll={() => navigate('/viewall/lessons')} />
               <div className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
-                {lessonPlans.map(plan => (
+                {plans.map(plan => (
                   <LessonCard
                     key={plan.id}
                     lesson={{
@@ -119,22 +121,21 @@ export default function LearnHome() {
                       type: 'lesson',
                       title: plan.title,
                       fullTitle: plan.title,
-                      category: plan.category,
+                      category: '',
                       description: plan.description,
                       keywords: [],
-                      seriesCount: 0,
+                      seriesCount: plan.bundles.length,
                       totalMinutes: 0,
-                      rating: plan.rating,
-                      reviews: plan.review_count,
-                      lessonPlanCoins: plan.credits_required,
+                      rating: 0,
+                      reviews: 0,
+                      lessonPlanCoins: plan.creditsRequired,
                       thumbnail: plan.image,
-                      background: plan.background,
-                      bundles: [],
+                      background: plan.image,
+                      bundles: plan.bundles as any[],
                       targetAudience: [],
-                      learningPoints: [],
-                      certificateOnCompletion: plan.certificate_on_completion,
+                      learningPoints: plan.learnings || [],
+                      certificateOnCompletion: true,
                     }}
-                    progress={getPercentage(String(plan.id)) || undefined}
                     onClick={() => navigate(`/lesson/${plan.id}`)}
                   />
                 ))}
@@ -144,7 +145,7 @@ export default function LearnHome() {
         )}
 
         {/* OpenAcademy Originals */}
-        {standaloneBundles.length > 0 && (
+        {series.length > 0 && (
           <div className="bg-bg-base section">
             <div className="container-content">
               <h2 className="type-display-large text-text-brand section-heading-gap">
@@ -152,15 +153,14 @@ export default function LearnHome() {
               </h2>
 
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 card-grid-gap">
-                {standaloneBundles.map(bundle => (
+                {series.map(s => (
                   <BundleThumbnail
-                    key={bundle.id}
-                    thumbnail={bundle.thumbnail}
-                    alt={bundle.title}
+                    key={s.id}
+                    thumbnail={s.image}
+                    alt={s.title}
                     size="big"
-                    progress={getPercentage(String(bundle.id)) || undefined}
-                    price={bundle.is_free ? 'free' : bundle.credits_required}
-                    onClick={() => handleBundleClick(bundle)}
+                    progress={getPercentage(String(s.id)) || undefined}
+                    onClick={() => s.bundle ? navigate(`/bundle/${s.bundle.id}`) : navigate(`/bundle/${s.id}`)}
                     className="w-full h-auto aspect-[3/4]"
                   />
                 ))}
@@ -173,30 +173,9 @@ export default function LearnHome() {
           </div>
         )}
 
-        {/* Don't Miss Out */}
-        {banners.length > 0 && (
-          <div className="bg-bg-base section-tight">
-            <div className="container-content">
-              <SectionHeader title="Don't Miss Out!" />
-              <div className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
-                {banners.map(banner => (
-                  <PromotionBanner
-                    key={banner.id}
-                    title={banner.title}
-                    subtitle=""
-                    image={banner.image}
-                    color={banner.color}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
         <div className="hidden md:block h-20" />
       </div>
 
-      {/* Purchase modal */}
       {modalBundle && (
         <PurchaseModal bundle={modalBundle} isOpen={true} onClose={closeModal} />
       )}

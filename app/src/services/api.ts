@@ -44,6 +44,22 @@ export function clearAuth() {
   localStorage.removeItem(USER_ID_KEY);
 }
 
+/** Get auth headers for use in external HTTP clients (e.g. hls.js) */
+export function getAuthHeaders(): Record<string, string> {
+  const token = getToken();
+  const userId = getUserId();
+  const headers: Record<string, string> = {
+    'Z-PLATFORM': 'web',
+    'Z-VERSION': '1.0.0',
+    'Z-DEVICEID': getDeviceId(),
+  };
+  if (token && userId) {
+    headers['Z-TOKEN'] = token;
+    headers['Z-USER'] = userId;
+  }
+  return headers;
+}
+
 // ---- Error ----
 
 export class ApiError extends Error {

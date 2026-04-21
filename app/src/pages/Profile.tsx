@@ -3,10 +3,9 @@ import { ChevronRight, Heart, Settings, LogOut, CreditCard, BookOpen, Clock } fr
 import { useAuth } from '../hooks/useAuth';
 import { useProgress } from '../hooks/useProgress';
 import { useCredits } from '../hooks/useCredits';
-import { useApi } from '../hooks/useApi';
 import OAButton from '../components/OAButton';
 import BundleThumbnail from '../components/BundleThumbnail';
-import type { ApiBundleSummary } from '../services/types';
+import { useBundle } from '../hooks/useOAData';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -148,7 +147,7 @@ export default function Profile() {
 /* ---- My Learning item — fetches bundle data ---- */
 
 function MyLearningItem({ bundleId, navigate }: { bundleId: number; navigate: (p: string) => void }) {
-  const { data: bundle } = useApi<ApiBundleSummary>(`/bundles/${bundleId}`);
+  const { data: bundle } = useBundle(bundleId);
   if (!bundle) return null;
 
   return (
@@ -156,13 +155,12 @@ function MyLearningItem({ bundleId, navigate }: { bundleId: number; navigate: (p
       onClick={() => navigate(`/play/${bundleId}/0`)}
       className="flex items-center gap-4 p-6 rounded-[12px] bg-bg-secondary hover:bg-gray-4/20 transition-colors text-left"
     >
-      <img src={bundle.thumbnail} alt="" className="w-16 h-16 rounded-[8px] object-cover shrink-0" />
+      <div className="w-16 h-16 rounded-[8px] bg-bg-secondary shrink-0" />
       <div className="flex-1 min-w-0">
-        <span className="type-tags text-text-category">{bundle.category}</span>
         <p className="type-headline-small text-text-primary mt-0.5 truncate">{bundle.title}</p>
         <div className="flex items-center gap-2 mt-1">
           <Clock size={12} className="text-text-tertiary" />
-          <span className="type-pre-text text-text-tertiary">{bundle.duration_minutes} mins</span>
+          <span className="type-pre-text text-text-tertiary">{bundle.durationMinutes} mins</span>
         </div>
       </div>
       <ChevronRight size={16} className="text-text-tertiary shrink-0" />
@@ -173,7 +171,7 @@ function MyLearningItem({ bundleId, navigate }: { bundleId: number; navigate: (p
 /* ---- Purchase History item — mock transaction ---- */
 
 function PurchaseHistoryItem({ bundleId, index }: { bundleId: number; index: number }) {
-  const { data: bundle } = useApi<ApiBundleSummary>(`/bundles/${bundleId}`);
+  const { data: bundle } = useBundle(bundleId);
   if (!bundle) return null;
 
   // Mock transaction data
@@ -193,7 +191,7 @@ function PurchaseHistoryItem({ bundleId, index }: { bundleId: number; index: num
       </div>
       <div className="flex items-center gap-1 shrink-0">
         <div className="w-3 h-3 rounded-full bg-accent-yellow" />
-        <span className="type-headline-small text-text-primary">{bundle.is_free ? 'Free' : bundle.credits_required}</span>
+        <span className="type-headline-small text-text-primary">{bundle.creditsRequired === 0 ? 'Free' : bundle.creditsRequired}</span>
       </div>
     </div>
   );

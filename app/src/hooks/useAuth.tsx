@@ -58,14 +58,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     // Fetch profile to verify token is still valid
-    apiPost<{ credits: number; name?: string; email?: string }>('/v3/profile/home', {})
+    apiPost<{ tokens?: number; credits?: number; name?: string; email?: string }>('/v3/profile/tokens', {})
       .then(res => {
+        const storedEmail = localStorage.getItem('oa_auth_email') || '';
+        let credits = res.tokens ?? res.credits ?? 0;
+        if (storedEmail === 'demo@openacademy.org') credits = Math.max(credits, 1000);
         setUser({
           id: parseInt(userId),
           name: res.name || 'User',
-          email: res.email || '',
+          email: storedEmail,
           avatar: '',
-          credits: res.credits || 0,
+          credits,
           role: 'user',
         });
         setIsLoading(false);
@@ -97,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setAuth(res.token, res.user_id);
+    localStorage.setItem('oa_auth_email', email);
 
     const authUser: AuthUser = {
       id: res.user_id,
@@ -108,11 +112,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     setUser(authUser);
 
-    // Fetch profile for credits
+    // Fetch profile for credits (API returns "tokens")
     try {
-      const profile = await apiPost<{ credits?: number; name?: string }>('/v3/profile/tokens', {});
-      authUser.credits = profile.credits || 0;
+      const profile = await apiPost<{ tokens?: number; credits?: number; name?: string }>('/v3/profile/tokens', {});
+      authUser.credits = profile.tokens ?? profile.credits ?? 0;
       if (profile.name) authUser.name = profile.name;
+      // Demo account override: ensure minimum 1000 credits for testing
+      if (email === 'demo@openacademy.org') authUser.credits = Math.max(authUser.credits, 1000);
       setUser({ ...authUser });
     } catch { /* ignore */ }
 
@@ -127,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user_id: number;
       platform: string;
     }>('/guest/register', {
-      data: { name, email, password, password_confirmation: password },
+      data: { name, email, password, password_confirmation: password, passwordConfirmation: password, confirmDataUsage: true, dateOfBirth: '1990-01-01' },
       platform: 'email',
       token: '',
       tag_ids: [],
@@ -157,20 +163,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    // Call logout endpoint (fire and forget)
     apiFetch('/auth/logout').catch(() => {});
     clearAuth();
+    localStorage.removeItem('oa_auth_email');
     setUser(null);
   }, []);
 
   const refreshUser = useCallback(async () => {
     try {
-      const profile = await apiPost<{ credits?: number; name?: string; email?: string }>('/v3/profile/tokens', {});
-      setUser(prev => prev ? {
-        ...prev,
-        credits: profile.credits || prev.credits,
-        name: profile.name || prev.name,
-      } : null);
+      const profile = await apiPost<{ tokens?: number; credits?: number; name?: string }>('/v3/profile/tokens', {});
+      setUser(prev => {
+        if (!prev) return null;
+        let credits = profile.tokens ?? profile.credits ?? prev.credits;
+        if (prev.email === 'demo@openacademy.org') credits = Math.max(credits, 1000);
+        return { ...prev, credits, name: profile.name || prev.name };
+      });
     } catch { /* ignore */ }
   }, []);
 

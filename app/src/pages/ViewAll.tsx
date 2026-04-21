@@ -2,9 +2,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import BundleThumbnail from '../components/BundleThumbnail';
 import LessonCard from '../components/LessonCard';
-import { useApi } from '../hooks/useApi';
+import { useHomepage } from '../hooks/useHomepage';
 import { useProgress } from '../hooks/useProgress';
-import type { ApiHomeListings } from '../services/types';
 
 type ViewType = 'continue' | 'foryou' | 'lessons';
 
@@ -17,15 +16,13 @@ const titles: Record<ViewType, string> = {
 export default function ViewAll() {
   const { type } = useParams<{ type: string }>();
   const navigate = useNavigate();
-  const { getPercentage, getContinueWatching } = useProgress();
-  const { data } = useApi<ApiHomeListings>('/listings/home');
+  const { getPercentage, getContinueWatching, removeFromContinueWatching } = useProgress();
+  const { forYou, plans } = useHomepage();
 
   const viewType = (type as ViewType) || 'foryou';
   const title = titles[viewType] || 'View All';
 
   const continueWatching = getContinueWatching();
-  const forYouVideos = data?.for_you ?? [];
-  const lessonPlans = data?.lessons ?? [];
 
   return (
     <div className="flex flex-col h-full bg-bg-base">
@@ -49,27 +46,36 @@ export default function ViewAll() {
           {/* Continue Watching — 2 column grid */}
           {viewType === 'continue' && (
             <div className="grid grid-cols-2 gap-1 px-6 py-4">
-              {continueWatching.map(item => (
-                <BundleThumbnail
-                  key={`${item.type}-${item.id}`}
-                  thumbnail={item.thumbnail}
-                  alt={item.chapterTitle}
-                  size="big"
-                  progress={item.percentage}
-                  onClick={() => navigate(item.type === 'lesson' ? `/lesson/${item.id}` : `/bundle/${item.id}`)}
-                  className="w-full h-auto aspect-[3/4]"
-                />
-              ))}
+              {continueWatching.map(item => {
+                const actions = [
+                  { label: 'Remove', onClick: () => removeFromContinueWatching(item.id) },
+                ];
+                if (item.planId) {
+                  actions.push({ label: 'Go to lessons', onClick: () => navigate(`/lesson/${item.planId}`) });
+                }
+                return (
+                  <BundleThumbnail
+                    key={`${item.type}-${item.id}`}
+                    thumbnail={item.thumbnail}
+                    alt={item.chapterTitle}
+                    size="big"
+                    progress={item.percentage}
+                    onClick={() => navigate(item.type === 'lesson' ? `/lesson/${item.id}` : `/bundle/${item.id}`)}
+                    className="w-full h-auto aspect-[3/4]"
+                    menuActions={actions}
+                  />
+                );
+              })}
             </div>
           )}
 
           {/* For You — 2 column grid using BundleThumbnail for consistent sizing */}
           {viewType === 'foryou' && (
             <div className="grid grid-cols-2 gap-1 px-6 py-4">
-              {forYouVideos.map((video, index) => (
+              {forYou.map((video, index) => (
                 <BundleThumbnail
                   key={video.id}
-                  thumbnail={video.thumbnail}
+                  thumbnail={video.video?.image || ''}
                   alt={video.title}
                   size="big"
                   onClick={() => navigate(`/foryou/${index}`)}
@@ -82,17 +88,17 @@ export default function ViewAll() {
           {/* Lessons — 1 column list */}
           {viewType === 'lessons' && (
             <div className="flex flex-col gap-4 px-6 py-4">
-              {lessonPlans.map(plan => (
+              {plans.map(plan => (
                 <LessonCard
                   key={plan.id}
                   lesson={{
                     id: plan.id, type: 'lesson', title: plan.title, fullTitle: plan.title,
-                    category: plan.category, description: plan.description, keywords: [],
-                    seriesCount: 0, totalMinutes: 0, rating: plan.rating,
-                    reviews: plan.review_count, lessonPlanCoins: plan.credits_required,
-                    thumbnail: plan.image, background: plan.background || plan.image,
-                    bundles: [], targetAudience: [], learningPoints: [],
-                    certificateOnCompletion: plan.certificate_on_completion,
+                    category: '', description: plan.description, keywords: [],
+                    seriesCount: plan.bundles.length, totalMinutes: 0, rating: 0,
+                    reviews: 0, lessonPlanCoins: plan.creditsRequired,
+                    thumbnail: plan.image, background: plan.image,
+                    bundles: plan.bundles as any[], targetAudience: [], learningPoints: plan.learnings || [],
+                    certificateOnCompletion: true,
                   }}
                   progress={getPercentage(String(plan.id)) || undefined}
                   onClick={() => navigate(`/lesson/${plan.id}`)}
@@ -121,27 +127,36 @@ export default function ViewAll() {
           {/* Continue Watching — 2 col grid, responsive to 3-4 */}
           {viewType === 'continue' && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 card-grid-gap">
-              {continueWatching.map(item => (
-                <BundleThumbnail
-                  key={`${item.type}-${item.id}`}
-                  thumbnail={item.thumbnail}
-                  alt={item.chapterTitle}
-                  size="big"
-                  progress={item.percentage}
-                  onClick={() => navigate(item.type === 'lesson' ? `/lesson/${item.id}` : `/bundle/${item.id}`)}
-                  className="w-full h-auto aspect-[3/4]"
-                />
-              ))}
+              {continueWatching.map(item => {
+                const actions = [
+                  { label: 'Remove', onClick: () => removeFromContinueWatching(item.id) },
+                ];
+                if (item.planId) {
+                  actions.push({ label: 'Go to lessons', onClick: () => navigate(`/lesson/${item.planId}`) });
+                }
+                return (
+                  <BundleThumbnail
+                    key={`${item.type}-${item.id}`}
+                    thumbnail={item.thumbnail}
+                    alt={item.chapterTitle}
+                    size="big"
+                    progress={item.percentage}
+                    onClick={() => navigate(item.type === 'lesson' ? `/lesson/${item.id}` : `/bundle/${item.id}`)}
+                    className="w-full h-auto aspect-[3/4]"
+                    menuActions={actions}
+                  />
+                );
+              })}
             </div>
           )}
 
           {/* For You — 2 col grid, responsive to 4-6 */}
           {viewType === 'foryou' && (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 card-grid-gap">
-              {forYouVideos.map((video, index) => (
+              {forYou.map((video, index) => (
                 <BundleThumbnail
                   key={video.id}
-                  thumbnail={video.thumbnail}
+                  thumbnail={video.video?.image || ''}
                   alt={video.title}
                   size="big"
                   onClick={() => navigate(`/foryou/${index}`)}
@@ -154,17 +169,17 @@ export default function ViewAll() {
           {/* Lessons — 1 column, max-width for readability */}
           {viewType === 'lessons' && (
             <div className="flex flex-col gap-6 max-w-[720px]">
-              {lessonPlans.map(plan => (
+              {plans.map(plan => (
                 <LessonCard
                   key={plan.id}
                   lesson={{
                     id: plan.id, type: 'lesson', title: plan.title, fullTitle: plan.title,
-                    category: plan.category, description: plan.description, keywords: [],
-                    seriesCount: 0, totalMinutes: 0, rating: plan.rating,
-                    reviews: plan.review_count, lessonPlanCoins: plan.credits_required,
-                    thumbnail: plan.image, background: plan.background || plan.image,
-                    bundles: [], targetAudience: [], learningPoints: [],
-                    certificateOnCompletion: plan.certificate_on_completion,
+                    category: '', description: plan.description, keywords: [],
+                    seriesCount: plan.bundles.length, totalMinutes: 0, rating: 0,
+                    reviews: 0, lessonPlanCoins: plan.creditsRequired,
+                    thumbnail: plan.image, background: plan.image,
+                    bundles: plan.bundles as any[], targetAudience: [], learningPoints: plan.learnings || [],
+                    certificateOnCompletion: true,
                   }}
                   progress={getPercentage(String(plan.id)) || undefined}
                   onClick={() => navigate(`/lesson/${plan.id}`)}

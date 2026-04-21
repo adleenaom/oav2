@@ -10,4 +10,28 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      '/v3': {
+        target: 'https://app.theopenacademy.org/api',
+        changeOrigin: true,
+        secure: true,
+      },
+      '/auth': {
+        target: 'https://app.theopenacademy.org/api',
+        changeOrigin: true,
+        secure: true,
+      },
+      '/guest': {
+        target: 'https://app.theopenacademy.org/api',
+        changeOrigin: true,
+        secure: true,
+      },
+      '/media': {
+        target: 'https://app.theopenacademy.org',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
+  },
 })

@@ -1,14 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Star, Heart, Search, BookOpen, Clock, Award, Video, HelpCircle, FileText, Users, GraduationCap } from 'lucide-react';
 import OAButton from '../components/OAButton';
 import ChaptersRow from '../components/ChaptersRow';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useApi } from '../hooks/useApi';
+import { usePlanDetail } from '../hooks/useOAData';
 import { useProgress } from '../hooks/useProgress';
 import { useCredits } from '../hooks/useCredits';
-import type { ApiPlanDetail } from '../services/types';
 
 const TABS = ['About', 'Lesson Bundles', 'Certificates', 'Instructors'] as const;
 type Tab = typeof TABS[number];
@@ -19,42 +18,55 @@ export default function LessonDetail() {
   const { getPercentage } = useProgress();
   const { credits } = useCredits();
   const [activeTab, setActiveTab] = useState<Tab>('About');
-  const { data: apiPlan, isLoading } = useApi<ApiPlanDetail>(id ? `/plans/${id}` : null);
+  const { plan: oaPlan, planBundles, isLoading } = usePlanDetail(id ? Number(id) : null);
 
-  // Map API response to component shape
-  const lesson = apiPlan ? {
-    id: apiPlan.id,
-    fullTitle: apiPlan.title,
-    category: apiPlan.category,
-    description: apiPlan.description,
-    rating: apiPlan.rating,
-    reviews: apiPlan.review_count,
-    lessonPlanCoins: apiPlan.credits_required,
-    thumbnail: apiPlan.image,
-    background: apiPlan.background || apiPlan.image,
-    certificateOnCompletion: apiPlan.certificate_on_completion,
-    targetAudience: apiPlan.target_audience,
-    learningPoints: apiPlan.learning_points,
-    bundles: apiPlan.bundles.map(b => ({
+  // Parse structured info field: [{type:"heading",content:""}, {type:"list1",content:""}, ...]
+  const infoItems = (oaPlan?.info || []).flat();
+  const targetAudience = infoItems
+    .filter((item: any) => item?.type === 'list1')
+    .map((item: any) => item.content);
+  const learningPoints = oaPlan?.learnings?.length
+    ? oaPlan.learnings
+    : infoItems.filter((item: any) => item?.type === 'list2').map((item: any) => item.content);
+
+  const lesson = oaPlan ? {
+    id: oaPlan.id,
+    fullTitle: oaPlan.title,
+    category: '',
+    description: oaPlan.description,
+    rating: 0,
+    reviews: 0,
+    lessonPlanCoins: oaPlan.creditsRequired,
+    thumbnail: oaPlan.image,
+    background: oaPlan.image,
+    certificateOnCompletion: (oaPlan.badges || []).length > 0,
+    targetAudience,
+    learningPoints,
+    bundles: planBundles.map((b, idx) => ({
       id: b.id,
       title: b.title,
-      subtitle: b.subtitle,
+      subtitle: `Bundle ${idx + 1}`,
       description: b.description,
-      category: b.category,
-      thumbnail: b.thumbnail,
-      isFree: b.is_free,
-      price: b.credits_required,
-      totalMinutes: b.duration_minutes,
+      category: '',
+      thumbnail: '',
+      isFree: b.creditsRequired === 0,
+      price: b.creditsRequired,
+      totalMinutes: b.durationMinutes,
       chapters: [] as { length: number }[],
-      chapterCount: b.chapter_count || 0,
-      creator: b.creator ? { id: b.creator.id, name: b.creator.name, avatar: b.creator.avatar, title: b.creator.job_title || '', bio: b.creator.bio || '' } : null,
+      chapterCount: (b.series || []).length,
+      creator: null as { id: number; name: string; avatar: string; title: string; bio: string } | null,
     })),
   } : null;
+
+  // Redirect home if plan not found (must be in useEffect, not during render)
+  useEffect(() => {
+    if (!isLoading && !oaPlan) navigate('/');
+  }, [isLoading, oaPlan, navigate]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="type-body-default text-text-tertiary">Loading...</div></div>;
   }
-  if (!lesson) { navigate('/'); return null; }
+  if (!lesson) return null;
 
   const totalChapters = lesson.bundles.reduce((acc, b) => acc + (b.chapterCount || 0), 0);
   const overallProgress = lesson.bundles.length > 0
@@ -146,7 +158,7 @@ export default function LessonDetail() {
             </div>
 
             {/* Black CTA — full-width bottom, rounded-b-12 */}
-            {lesson.lessonPlanCoins > 0 && overallProgress === 0 && (
+            {lesson.lessonPlanCoins > 0 && overallProgress === 0 && lesson.bundles.length > 0 && (
               <button
                 onClick={() => navigate(`/bundle/${lesson.bundles[0].id}`)}
                 className="bg-action-primary flex items-center justify-center gap-1 px-4 py-3 rounded-b-[12px]"
@@ -267,7 +279,7 @@ export default function LessonDetail() {
                     variant="blue"
                     size="medium"
                     fullWidth
-                    onClick={() => navigate(`/bundle/${bundle.id}`)}
+                    onClick={() => navigate(bundle.isFree ? `/play/${bundle.id}/0` : `/bundle/${bundle.id}`)}
                   >
                     {bundle.isFree ? 'Start Bundle' : `Get this bundle | 🪙 ${bundle.price}`}
                   </OAButton>
@@ -442,9 +454,11 @@ export default function LessonDetail() {
                       </div>
                     </>
                   )}
-                  <OAButton variant="primary" size="medium" fullWidth onClick={() => navigate(`/bundle/${lesson.bundles[0].id}`)}>
-                    {overallProgress > 0 ? 'Resume Learning' : lesson.lessonPlanCoins > 0 ? `Get for ${lesson.lessonPlanCoins} Credits` : 'Start Learning'}
-                  </OAButton>
+                  {lesson.bundles.length > 0 && (
+                    <OAButton variant="primary" size="medium" fullWidth onClick={() => navigate(`/bundle/${lesson.bundles[0].id}`)}>
+                      {overallProgress > 0 ? 'Resume Learning' : lesson.lessonPlanCoins > 0 ? `Get for ${lesson.lessonPlanCoins} Credits` : 'Start Learning'}
+                    </OAButton>
+                  )}
                 </div>
 
                 {/* Stats row with icons */}

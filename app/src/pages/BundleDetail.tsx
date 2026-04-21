@@ -1,13 +1,13 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Heart, Search, BookOpen, Download, Check } from 'lucide-react';
 import OAButton from '../components/OAButton';
+import PurchaseModal from '../components/PurchaseModal';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useApi } from '../hooks/useApi';
+import { useBundleDetail } from '../hooks/useOAData';
 import { useProgress } from '../hooks/useProgress';
 import { useCredits } from '../hooks/useCredits';
 import { useState } from 'react';
-import type { ApiBundleDetail } from '../services/types';
 
 type Tab = 'about' | 'chapters';
 
@@ -15,32 +15,23 @@ export default function BundleDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { getBundleProgress, getBundlePercentage } = useProgress();
-  const { credits, purchaseBundle, isBundleAccessible } = useCredits();
-  const { data: apiBundle, isLoading } = useApi<ApiBundleDetail>(id ? `/bundles/${id}` : null);
+  const { credits, isBundleAccessible } = useCredits();
+  const { bundle: oaBundle, seriesList, resolvedChapters, isLoading } = useBundleDetail(id ? Number(id) : null);
 
-  // Flatten chapters from all series
-  const allChapters = apiBundle?.series?.flatMap(s => s.chapters) ?? [];
-  const resources = apiBundle?.series?.flatMap(s => s.resources) ?? [];
-
-  const bundle = apiBundle ? {
-    id: apiBundle.id,
-    planId: apiBundle.plan_id,
-    title: apiBundle.title,
-    subtitle: apiBundle.subtitle,
-    description: apiBundle.description,
-    category: apiBundle.category,
-    price: apiBundle.credits_required,
-    isFree: apiBundle.is_free,
-    thumbnail: apiBundle.thumbnail,
-    totalMinutes: apiBundle.duration_minutes,
-    creator: apiBundle.creator ? {
-      name: apiBundle.creator.name,
-      avatar: apiBundle.creator.avatar,
-      title: apiBundle.creator.job_title || '',
-      bio: apiBundle.creator.bio || '',
-    } : null,
-    chapters: allChapters,
-    resources,
+  const bundle = oaBundle ? {
+    id: oaBundle.id,
+    planId: oaBundle.plan?.id || null,
+    title: oaBundle.title,
+    subtitle: `Bundle ${oaBundle.seqNo || 1}`,
+    description: oaBundle.description,
+    category: '',
+    price: oaBundle.creditsRequired,
+    isFree: oaBundle.creditsRequired === 0,
+    thumbnail: seriesList[0]?.image || '',
+    totalMinutes: oaBundle.durationMinutes,
+    creator: null as { name: string; avatar: string; title: string; bio: string } | null,
+    chapters: resolvedChapters,
+    resources: [] as { id: number; title: string; url: string }[],
   } : null;
 
   const progress = getBundleProgress(id || '');
@@ -49,7 +40,8 @@ export default function BundleDetail() {
   const parentLesson = bundle?.planId ? { id: bundle.planId } : null;
 
   const [activeTab, setActiveTab] = useState<Tab>('chapters');
-  const [purchaseError, setPurchaseError] = useState(false);
+  const [purchaseError] = useState(false);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="type-body-default text-text-tertiary">Loading...</div></div>;
@@ -66,22 +58,13 @@ export default function BundleDetail() {
     navigate(`/play/${bundle.id}/${idx >= 0 ? idx : 0}`);
   };
 
-  const handlePurchase = async () => {
-    setPurchaseError(false);
-    const success = await purchaseBundle(bundle.id);
-    if (!success) {
-      setPurchaseError(true);
-      setTimeout(() => setPurchaseError(false), 3000);
-    }
-  };
-
   const handleCTA = () => {
     if (!hasAccess) {
-      handlePurchase();
+      setShowPurchaseModal(true);
       return;
     }
     const first = bundle.chapters.find(c => !completedChapters.includes(String(c.id)));
-    handlePlayChapter(String(first?.id || bundle.chapters[0].id));
+    handlePlayChapter(String(first?.id || bundle.chapters[0]?.id));
   };
 
 
@@ -251,7 +234,7 @@ export default function BundleDetail() {
                 const done = completedChapters.includes(chId);
                 const isPlaying = false;
                 const isLocked = !hasAccess && idx > 0;
-                const hasSurvey = chapter.parts.some(p => p.type === 'survey');
+                const hasSurvey = chapter.hasAssessment;
                 const isViewed = done;
                 const isGrayed = isViewed; // viewed chapters get gray-2 text
 
@@ -434,7 +417,7 @@ export default function BundleDetail() {
                     const done = completedChapters.includes(chId);
                     const isPlaying = false;
                     const isLocked = !hasAccess && idx > 0;
-                    const hasSurvey = chapter.parts.some(p => p.type === 'survey');
+                    const hasSurvey = chapter.hasAssessment;
                     const isViewed = done;
                     return (
                       <button
@@ -528,6 +511,26 @@ export default function BundleDetail() {
           </div>
         </div>
       </div>
+
+      {/* Purchase Modal */}
+      <PurchaseModal
+        bundle={{
+          id: bundle.id,
+          plan_id: bundle.planId,
+          title: bundle.title,
+          subtitle: bundle.subtitle,
+          description: bundle.description,
+          category: bundle.category,
+          credits_required: bundle.price,
+          duration_minutes: bundle.totalMinutes,
+          is_free: bundle.isFree,
+          thumbnail: bundle.thumbnail,
+          chapter_count: bundle.chapters.length,
+          creator: null,
+        }}
+        isOpen={showPurchaseModal}
+        onClose={() => setShowPurchaseModal(false)}
+      />
     </div>
   );
 }

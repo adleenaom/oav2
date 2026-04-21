@@ -1,28 +1,25 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { VideoPlayer } from '@/components/ui/video-player';
 import type { VideoItem } from '@/components/ui/video-player';
-import { useApi } from '../hooks/useApi';
+import { useHomepage } from '../hooks/useHomepage';
 import { useProgress } from '../hooks/useProgress';
 import { useCallback } from 'react';
-import type { ApiHomeListings } from '../services/types';
 
 export default function ForYouPlayer() {
   const { index } = useParams<{ index: string }>();
   const navigate = useNavigate();
   const { updateForYouProgress } = useProgress();
-  const { data } = useApi<ApiHomeListings>('/listings/home');
+  const { forYou, isLoading } = useHomepage();
 
-  const forYouVideos = data?.for_you ?? [];
-
-  const videos: VideoItem[] = forYouVideos.map(v => ({
+  const videos: VideoItem[] = forYou.map(v => ({
     id: v.id,
     title: v.title,
-    fullTitle: v.full_title,
-    category: v.category,
-    description: v.description,
+    fullTitle: v.title,
+    category: '',
+    description: '',
     keywords: [],
-    videoUrl: v.video_url,
-    thumbnail: v.thumbnail,
+    videoUrl: v.video.source,
+    thumbnail: v.video.image,
   }));
 
   const handleProgressUpdate = useCallback(
@@ -32,7 +29,7 @@ export default function ForYouPlayer() {
     [updateForYouProgress]
   );
 
-  if (videos.length === 0) {
+  if (isLoading || videos.length === 0) {
     return (
       <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
         <div className="type-body-default text-white/60">Loading...</div>

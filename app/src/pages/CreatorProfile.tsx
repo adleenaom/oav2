@@ -1,19 +1,20 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Globe, BookOpen } from 'lucide-react';
-import { useApi } from '../hooks/useApi';
+import { useCreator } from '../hooks/useOAData';
 import BundleThumbnail from '../components/BundleThumbnail';
 
-interface CreatorDetail {
-  id: number; name: string; avatar: string; job_title: string;
-  bio: string; homepage: string; offerings: string;
-  bundles: { id: number; title: string; subtitle: string; thumbnail: string; category: string; is_free: boolean; credits_required: number }[];
-  videos: { id: number; title: string; thumbnail: string; category: string }[];
-}
+// Creator detail type is resolved from useCreator hook
 
 export default function CreatorProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: creator, isLoading } = useApi<CreatorDetail>(id ? `/creators/${id}` : null);
+  const { data: oaCreator, isLoading } = useCreator(id ? Number(id) : null);
+  const creator = oaCreator ? {
+    ...oaCreator,
+    job_title: oaCreator.jobTitle,
+    bundles: [] as { id: number; title: string; subtitle: string; thumbnail: string; category: string; is_free: boolean; credits_required: number }[],
+    videos: [] as { id: number; title: string; thumbnail: string; category: string }[],
+  } : null;
 
   if (isLoading) return <div className="flex items-center justify-center h-full"><div className="type-body-default text-text-tertiary">Loading...</div></div>;
   if (!creator) { navigate('/'); return null; }
