@@ -1,14 +1,12 @@
 FROM node:22-alpine AS build
 
-RUN apk add --no-cache git
-
 WORKDIR /app
 
-RUN git clone https://github.com/adleenaom/oav2.git /tmp/repo
-
-RUN cp -r /tmp/repo/app/. /app/ && rm -rf /tmp/repo
-
+# Copy app source directly (no git clone — Coolify checks out the repo)
+COPY app/package.json app/package-lock.json ./
 RUN npm install
+
+COPY app/ ./
 
 ENV VITE_API_URL=
 RUN npm run build
