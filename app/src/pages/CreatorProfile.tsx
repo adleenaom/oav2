@@ -3,6 +3,7 @@ import { Globe, BookOpen } from 'lucide-react';
 import { useCreator } from '../hooks/useOAData';
 import BundleThumbnail from '../components/BundleThumbnail';
 import Breadcrumb from '../components/Breadcrumb';
+import { bundleUrl } from '../utils/slug';
 
 // Creator detail type is resolved from useCreator hook
 
@@ -70,7 +71,7 @@ export default function CreatorProfile() {
                     alt={bundle.title}
                     size="big"
                     price={bundle.is_free ? 'free' : bundle.credits_required}
-                    onClick={() => navigate(`/bundle/${bundle.id}`)}
+                    onClick={() => navigate(bundleUrl(bundle.id))}
                     className="w-full h-auto aspect-[3/4]"
                   />
                 ))}

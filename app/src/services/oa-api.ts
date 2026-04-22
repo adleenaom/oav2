@@ -41,6 +41,7 @@ export interface OASeries {
   creator: { id: number; type: string } | null;
   chapters: { id: number; type: string }[];
   tags: { id: number; type: string }[];
+  resources: { id: number; type: string }[];
   info: string[][];
   introVideo: OAVideo | null;
 }
@@ -111,6 +112,41 @@ export interface OAContent {
   updatedAt: number;
 }
 
+export interface OAAssessmentOption {
+  id: number;
+  answer: string;
+  answered: boolean;
+  totalAnswered: number;
+  isCorrect: boolean;
+}
+
+export interface OAAssessmentContent {
+  id: number;
+  seqNo: number;
+  chapterId: number;
+  seriesId: number;
+  type: 'assessment';
+  title: string;
+  ready: boolean;
+  assessments: OAAssessmentOption[];
+  updatedAt: number;
+}
+
+export interface OAResource {
+  id: number;
+  name: string;
+  updatedAt: number;
+}
+
+export interface OAReview {
+  id: number;
+  content: string;
+  avatar: string;
+  name: string;
+  rating: number;
+  updatedAt: number;
+}
+
 export interface OAListingRef {
   id: number;
   updatedAt: number;
@@ -170,6 +206,20 @@ export async function getChapters(ids: number[]) {
 export async function getContents(ids: number[]) {
   if (ids.length === 0) return [];
   const res = await apiPost<{ items: OAContent[] }>('/v3/contents/retrieve', { items: ids });
+  return res.items || [];
+}
+
+/** Get full resource objects by IDs */
+export async function getResources(ids: number[]) {
+  if (ids.length === 0) return [];
+  const res = await apiPost<{ items: OAResource[] }>('/v3/resources/retrieve', { items: ids });
+  return res.items || [];
+}
+
+/** Get review objects by IDs */
+export async function getReviews(ids: number[]) {
+  if (ids.length === 0) return [];
+  const res = await apiPost<{ items: OAReview[] }>('/v3/reviews/retrieve', { items: ids });
   return res.items || [];
 }
 
@@ -239,34 +289,44 @@ export async function getHomepageData() {
       const uniqueAllSeriesIds = [...new Set(allSeriesIds)];
       const allSeries = uniqueAllSeriesIds.length > 0 ? await getSeries(uniqueAllSeriesIds) : [];
 
+      // Identify test-only series (chapters with only assessments, no video content)
+      const allChapterIds = allSeries.flatMap(s => (s.chapters || []).map(ch => ch.id));
+      let testOnlySeriesIds = new Set<number>();
+      if (allChapterIds.length > 0) {
+        try {
+          const chapters = await getChapters(allChapterIds);
+          // A series is test-only if ALL its chapters have assessments but no content
+          for (const s of allSeries) {
+            const sChapterIds = (s.chapters || []).map(ch => ch.id);
+            const sChapters = chapters.filter(ch => sChapterIds.includes(ch.id));
+            const isTestOnly = sChapters.length > 0 && sChapters.every(ch =>
+              (ch.assessments || []).length > 0 && (ch.contents || []).length === 0
+            );
+            if (isTestOnly) testOnlySeriesIds.add(s.id);
+          }
+        } catch {}
+      }
+
       for (const b of bundles) {
         const bSeriesIds = (b.series || []).map(s => s.id);
-        const bSeries = allSeries.filter(s => bSeriesIds.includes(s.id));
+        // Sort to match bundle's series order, exclude test-only series
+        const bSeries = bSeriesIds
+          .filter(id => !testOnlySeriesIds.has(id))
+          .map(id => allSeries.find(s => s.id === id))
+          .filter(Boolean) as OASeries[];
+        const videoChapterCount = bSeriesIds.filter(id => !testOnlySeriesIds.has(id)).length;
         discoverBundles.push({
           bundleId: b.id,
           bundleTitle: b.title,
           bundleDescription: b.description,
           creditsRequired: b.creditsRequired,
           durationMinutes: b.durationMinutes,
-          chapterCount: bSeriesIds.length,
+          chapterCount: videoChapterCount,
           allSeries: bSeries,
         });
       }
     }
-    // Add standalone series (no bundle)
-    for (const s of series) {
-      if (!s.bundle) {
-        discoverBundles.push({
-          bundleId: s.id,
-          bundleTitle: s.title,
-          bundleDescription: s.description || '',
-          creditsRequired: 0,
-          durationMinutes: 0,
-          chapterCount: 1,
-          allSeries: [s],
-        });
-      }
-    }
+    // Standalone series (no bundle) are excluded — they don't have a valid bundle page
   } catch (e) { console.warn('Failed to resolve discover bundles:', e); }
 
   return {

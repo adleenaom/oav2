@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCredits } from './useCredits';
 import type { ApiBundleSummary } from '../services/types';
+import { playUrl } from '../utils/slug';
 
 /**
  * Hook for handling bundle thumbnail clicks:
@@ -17,7 +18,7 @@ export function useBundleNavigation() {
     const accessible = isBundleAccessible(bundle.id, bundle.is_free);
     if (accessible) {
       // Purchased → go directly to player
-      navigate(`/play/${bundle.id}/0`);
+      navigate(playUrl(bundle.id, 0, bundle.title));
     } else {
       // Not purchased → show purchase modal
       setModalBundle(bundle);

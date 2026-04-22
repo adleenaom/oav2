@@ -218,7 +218,8 @@ function ChapterVideoPlayer({
             <p className="font-serif italic text-[16px] text-white leading-normal">{bundleTitle}</p>
             <p className="type-pre-text text-white/70">Part {partNumber} of {totalParts}</p>
           </div>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center">
+          {/* Close button — mobile only (desktop has it outside the container) */}
+          <button onClick={onClose} className="md:hidden w-10 h-10 flex items-center justify-center">
             <X size={24} className="text-white" />
           </button>
         </div>
@@ -325,6 +326,14 @@ function ChapterVideoPlayer({
       className={cn("fixed inset-0 z-[100] bg-black flex items-center justify-center", className)}
       onClick={resetControlsTimer}
     >
+      {/* Desktop close button — outside video container */}
+      <button
+        onClick={onClose}
+        className="hidden md:flex absolute top-6 right-6 z-[110] w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 items-center justify-center transition-colors"
+      >
+        <X size={22} className="text-white" />
+      </button>
+
       {/* Video container — full-screen on mobile, centered 9:16 on desktop */}
       <div
         className="relative w-full h-full md:w-auto md:h-auto md:rounded-2xl md:overflow-hidden md:shrink-0"

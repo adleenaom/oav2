@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Star, Heart, Search, BookOpen, Clock, Award, Video, HelpCircle, FileText, Users, GraduationCap } from 'lucide-react';
+import { ChevronLeft, Star, Heart, Search, BookOpen, Clock, Award, Video, HelpCircle, FileText, Users, GraduationCap, Share2 } from 'lucide-react';
 import OAButton from '../components/OAButton';
 import ChaptersRow from '../components/ChaptersRow';
 import Breadcrumb from '../components/Breadcrumb';
@@ -9,12 +9,15 @@ import { cn } from '@/lib/utils';
 import { usePlanDetail } from '../hooks/useOAData';
 import { useProgress } from '../hooks/useProgress';
 import { useCredits } from '../hooks/useCredits';
+import CoinIcon from '../components/CoinIcon';
+import { fromSlug, bundleUrl, playUrl } from '../utils/slug';
 
 const TABS = ['About', 'Lesson Bundles', 'Certificates', 'Instructors'] as const;
 type Tab = typeof TABS[number];
 
 export default function LessonDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
+  const id = slug ? String(fromSlug(slug)) : null;
   const navigate = useNavigate();
   const { getPercentage } = useProgress();
   const { credits } = useCredits();
@@ -92,7 +95,7 @@ export default function LessonDetail() {
             </div>
             <div className="absolute top-[52px] right-6 z-10">
               <div className="bg-bg-elevated border border-border-input rounded-lg p-2 flex items-center gap-0.5 h-[34px]">
-                <div className="w-3.5 h-3.5 rounded-full bg-accent-yellow" />
+                <CoinIcon size={14} />
                 <span className="font-semibold text-[14px] text-text-primary leading-[20px] font-sans">{credits}</span>
               </div>
             </div>
@@ -161,12 +164,12 @@ export default function LessonDetail() {
             {/* Black CTA — full-width bottom, rounded-b-12 */}
             {lesson.lessonPlanCoins > 0 && overallProgress === 0 && lesson.bundles.length > 0 && (
               <button
-                onClick={() => navigate(`/bundle/${lesson.bundles[0].id}`)}
+                onClick={() => navigate(bundleUrl(lesson.bundles[0].id, lesson.bundles[0].title))}
                 className="bg-action-primary flex items-center justify-center gap-1 px-4 py-3 rounded-b-[12px]"
               >
                 <span className="type-button text-text-on-dark">Get this as lesson plan</span>
                 <span className="text-white/40 mx-1">|</span>
-                <div className="w-4 h-4 rounded-full bg-accent-yellow" />
+                <CoinIcon size={16} />
                 <span className="type-button text-text-on-dark">{lesson.lessonPlanCoins.toLocaleString()}</span>
               </button>
             )}
@@ -280,9 +283,9 @@ export default function LessonDetail() {
                     variant="blue"
                     size="medium"
                     fullWidth
-                    onClick={() => navigate(bundle.isFree ? `/play/${bundle.id}/0` : `/bundle/${bundle.id}`)}
+                    onClick={() => navigate(bundle.isFree ? playUrl(bundle.id, 0, bundle.title) : bundleUrl(bundle.id, bundle.title))}
                   >
-                    {bundle.isFree ? 'Start Bundle' : `Get this bundle | 🪙 ${bundle.price}`}
+                    {bundle.isFree ? 'Start Bundle' : <span className="flex items-center justify-center gap-1">Get this bundle | <CoinIcon size={14} /> {bundle.price}</span>}
                   </OAButton>
 
                   <div className="h-px bg-border-default mt-2" />
@@ -354,37 +357,75 @@ export default function LessonDetail() {
         </div>
       </div>
 
-      {/* ===== DESKTOP (Figma layout: bundles LEFT, info RIGHT) ===== */}
+      {/* ===== DESKTOP — Spotify-inspired hero + two-column body ===== */}
       <div className="hidden md:flex flex-col flex-1 overflow-y-auto">
-        {/* Hero — lesson plan thumbnail, 360px */}
-        <div className="relative w-full h-[360px] overflow-hidden">
-          <img src={lesson.thumbnail} alt="" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-          <div className="container-content absolute inset-0 flex flex-col justify-between pt-8 pb-4">
-            <div className="flex items-center justify-between">
-              <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-text-on-dark hover:opacity-80 transition-opacity">
-                <ChevronLeft size={16} />
-                <span className="type-headline-small text-text-on-dark">Back</span>
-              </button>
-              <div className="bg-bg-elevated/90 border border-border-input rounded-lg p-2 flex items-center gap-1 h-[34px]">
-                <div className="w-3.5 h-3.5 rounded-full bg-accent-yellow" />
-                <span className="font-semibold text-[14px] text-text-primary font-sans">{credits}</span>
-              </div>
+
+        {/* Hero header — blurred lesson thumbnail + title + action bar */}
+        <div className="relative w-full min-h-[300px] bg-[#1a1a2e] overflow-hidden">
+          <img
+            src={lesson.thumbnail}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover scale-110 blur-[20px] brightness-[0.6]"
+            style={{ display: lesson.thumbnail ? 'block' : 'none' }}
+          />
+          <div className="absolute inset-0 bg-black/30" />
+
+          <div className="container-content relative z-10 flex flex-col justify-end min-h-[300px] pt-6 pb-8">
+            <Breadcrumb items={[
+              { label: 'Home', path: '/' },
+              { label: 'Lessons', path: '/viewall/lessons' },
+              { label: lesson.fullTitle },
+            ]} />
+
+            <h1 className="font-bold text-[40px] lg:text-[48px] leading-[1.1] text-white mt-2 font-sans">
+              {lesson.fullTitle}
+            </h1>
+
+            <div className="flex items-center gap-3 mt-3">
+              <span className="type-body-default text-white/70">{lesson.bundles.length} bundles</span>
+              <span className="text-white/30">·</span>
+              <span className="type-body-default text-white/70">{totalChapters} chapters</span>
+              {lesson.category && (
+                <>
+                  <span className="text-white/30">·</span>
+                  <span className="type-body-default text-white/70">{lesson.category}</span>
+                </>
+              )}
             </div>
-            <div>
-              <span className="type-tags text-accent-blue">{lesson.category}</span>
-              <h1 className="font-bold text-[40px] leading-[48px] text-text-on-dark mt-1 font-sans">{lesson.fullTitle}</h1>
+
+            {/* Action bar */}
+            <div className="flex items-center gap-4 mt-6">
+              {lesson.bundles.length > 0 && (
+                <OAButton
+                  variant="primary"
+                  size="medium"
+                  onClick={() => navigate(lesson.bundles[0].isFree ? playUrl(lesson.bundles[0].id, 0, lesson.bundles[0].title) : bundleUrl(lesson.bundles[0].id, lesson.bundles[0].title))}
+                >
+                  {overallProgress > 0 ? 'Resume Learning' : lesson.lessonPlanCoins > 0 ? `Get for ${lesson.lessonPlanCoins} Credits` : 'Start Learning'}
+                </OAButton>
+              )}
+              <button className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors">
+                <Heart size={18} className="text-white" />
+              </button>
+              <button className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors">
+                <Share2 size={18} className="text-white" />
+              </button>
+              {lesson.lessonPlanCoins > 0 && overallProgress === 0 && (
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <CoinIcon size={16} />
+                  <span className="type-headline-small text-white">{lesson.lessonPlanCoins}</span>
+                  <span className="type-description text-white/60">credits</span>
+                </div>
+              )}
+              {overallProgress > 0 && (
+                <span className="type-pre-text text-accent-blue ml-auto">{overallProgress}% complete</span>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Two-column body: LEFT = bundles with chapters, RIGHT = sticky info */}
+        {/* Two-column body: LEFT = bundles with chapters, RIGHT = sticky info cards */}
         <div className="container-content py-8">
-          <Breadcrumb items={[
-            { label: 'Home', path: '/' },
-            { label: 'Lessons', path: '/viewall/lessons' },
-            { label: lesson.fullTitle },
-          ]} />
           <div className="flex gap-12 lg:gap-16">
 
             {/* LEFT — Certificate + Bundle listings with ChaptersRow */}
@@ -435,99 +476,94 @@ export default function LessonDetail() {
                       variant="blue"
                       size="medium"
                       fullWidth
-                      onClick={() => navigate(`/bundle/${bundle.id}`)}
+                      onClick={() => navigate(bundleUrl(bundle.id, bundle.title))}
                     >
-                      {bundle.isFree ? 'Start Bundle' : `Get this bundle | 🪙 ${bundle.price}`}
+                      {bundle.isFree ? 'Start Bundle' : <span className="flex items-center justify-center gap-1">Get this bundle | <CoinIcon size={14} /> {bundle.price}</span>}
                     </OAButton>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* RIGHT — Sticky sidebar */}
-            <div className="w-[340px] lg:w-[380px] shrink-0">
-              <div className="sticky top-24 flex flex-col gap-8 py-1">
-                {/* CTA card */}
-                <div className="bg-bg-elevated rounded-[16px] p-6 flex flex-col gap-4" style={{ boxShadow: 'var(--shadow-button)' }}>
-                  {overallProgress > 0 && (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <span className="type-description font-semibold text-text-primary">Progress</span>
-                        <span className="type-description font-bold text-accent-blue">{overallProgress}%</span>
-                      </div>
-                      <div className="w-full h-2 bg-border-default/40 rounded-full overflow-hidden">
-                        <div className="h-full bg-accent-blue rounded-full" style={{ width: `${overallProgress}%` }} />
-                      </div>
-                    </>
-                  )}
-                  {lesson.bundles.length > 0 && (
-                    <OAButton variant="primary" size="medium" fullWidth onClick={() => navigate(`/bundle/${lesson.bundles[0].id}`)}>
-                      {overallProgress > 0 ? 'Resume Learning' : lesson.lessonPlanCoins > 0 ? `Get for ${lesson.lessonPlanCoins} Credits` : 'Start Learning'}
-                    </OAButton>
-                  )}
+            {/* RIGHT — Sticky info cards */}
+            <div className="w-[300px] lg:w-[340px] shrink-0">
+              <div className="sticky top-20 flex flex-col gap-5">
+
+                {/* About card */}
+                <div className="bg-bg-secondary rounded-[16px] p-6">
+                  <h3 className="type-headline-small text-text-primary mb-3">About</h3>
+                  <p className="type-body-default text-text-secondary">{lesson.description}</p>
                 </div>
 
-                {/* Stats row with icons */}
-                <div className="flex items-center gap-6">
-                  <div className="flex items-center gap-1.5">
-                    <Star size={16} fill="var(--color-orange)" color="var(--color-orange)" />
-                    <span className="type-body-default text-text-primary">{lesson.rating}</span>
-                  </div>
-                  <div className="w-px h-5 bg-border-default" />
-                  <div className="flex items-center gap-1.5">
-                    <BookOpen size={16} className="text-text-primary" />
-                    <span className="type-pre-text text-text-primary">{lesson.bundles.length} Bundles</span>
-                  </div>
-                  <div className="w-px h-5 bg-border-default" />
-                  <div className="flex items-center gap-1.5">
-                    <Clock size={16} className="text-text-primary" />
-                    <span className="type-pre-text text-text-primary">{totalChapters} Chapters</span>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <p className="type-body-default text-text-secondary">{lesson.description}</p>
-
-                {/* Made just for */}
-                <div className="flex flex-col gap-4">
-                  <h3 className="type-headline-medium text-text-primary">Made just for</h3>
-                  <div className="flex flex-col gap-3">
-                    {lesson.targetAudience.map((item, i) => (
-                      <div key={i} className="flex items-start gap-3">
-                        <div className="w-1.5 h-1.5 rounded-full bg-text-primary mt-2.5 shrink-0" />
-                        <p className="type-body-default text-text-secondary">{item}</p>
+                {/* Progress card */}
+                {overallProgress > 0 && (
+                  <div className="bg-bg-secondary rounded-[16px] p-6">
+                    <h3 className="type-headline-small text-text-primary mb-4">Progress</h3>
+                    <div className="flex items-center gap-4">
+                      <div className="relative w-12 h-12 shrink-0">
+                        <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
+                          <circle cx="24" cy="24" r="20" stroke="var(--color-gray-4)" strokeWidth="3" fill="none" />
+                          <circle cx="24" cy="24" r="20" stroke="var(--color-brand-oa-blue)" strokeWidth="3" fill="none" strokeDasharray={`${(overallProgress / 100) * 125.6} 125.6`} strokeLinecap="round" />
+                        </svg>
+                        <span className="absolute inset-0 flex items-center justify-center type-pre-text font-bold text-text-primary">{overallProgress}%</span>
                       </div>
-                    ))}
+                      <div>
+                        <p className="type-description font-semibold text-text-primary">{lesson.bundles.length} bundles · {totalChapters} chapters</p>
+                        <p className="type-pre-text text-text-tertiary">{overallProgress === 100 ? 'All done!' : 'Keep going!'}</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* What you'll learn */}
-                <div className="flex flex-col gap-4">
-                  <h3 className="type-headline-medium text-text-primary">What you'll learn</h3>
-                  <div className="flex flex-col gap-3">
-                    {lesson.learningPoints.map((item, i) => (
-                      <div key={i} className="flex items-start gap-3">
-                        <div className="w-5 h-5 rounded-full bg-accent-green/20 flex items-center justify-center mt-0.5 shrink-0">
-                          <span className="text-accent-green text-[10px]">✓</span>
+                {/* Made just for card */}
+                {lesson.targetAudience.length > 0 && (
+                  <div className="bg-bg-secondary rounded-[16px] p-6">
+                    <h3 className="type-headline-small text-text-primary mb-3">Made just for</h3>
+                    <div className="flex flex-col gap-2.5">
+                      {lesson.targetAudience.map((item, i) => (
+                        <div key={i} className="flex items-start gap-3">
+                          <div className="w-1.5 h-1.5 rounded-full bg-text-primary mt-2 shrink-0" />
+                          <p className="type-description text-text-secondary">{item}</p>
                         </div>
-                        <p className="type-body-default text-text-secondary">{item}</p>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Instructors */}
-                <div className="flex flex-col gap-4">
-                  <h3 className="type-headline-medium text-text-primary">Your instructors</h3>
-                  <div className="flex flex-wrap gap-6">
-                    {lesson.bundles.filter(b => b.creator).map(b => (
-                      <div key={b.creator!.id} className="flex items-center gap-3">
-                        <img src={b.creator!.avatar} alt={b.creator!.name} className="w-12 h-12 rounded-full object-cover" />
-                        <p className="type-headline-small text-text-primary">{b.creator!.name}</p>
-                      </div>
-                    ))}
+                {/* What you'll learn card */}
+                {lesson.learningPoints.length > 0 && (
+                  <div className="bg-bg-secondary rounded-[16px] p-6">
+                    <h3 className="type-headline-small text-text-primary mb-3">What you'll learn</h3>
+                    <div className="flex flex-col gap-2.5">
+                      {lesson.learningPoints.map((item, i) => (
+                        <div key={i} className="flex items-start gap-3">
+                          <div className="w-4 h-4 rounded-full bg-accent-green/20 flex items-center justify-center mt-0.5 shrink-0">
+                            <span className="text-accent-green text-[9px]">✓</span>
+                          </div>
+                          <p className="type-description text-text-secondary">{item}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {/* Instructors card */}
+                {lesson.bundles.some(b => b.creator) && (
+                  <div className="bg-bg-secondary rounded-[16px] p-6">
+                    <h3 className="type-headline-small text-text-primary mb-3">Instructors</h3>
+                    <div className="flex flex-col gap-3">
+                      {lesson.bundles.filter(b => b.creator).map(b => (
+                        <div key={b.creator!.id} className="flex items-center gap-3">
+                          <img src={b.creator!.avatar} alt={b.creator!.name} className="w-10 h-10 rounded-full object-cover" />
+                          <div>
+                            <p className="type-headline-small text-text-primary">{b.creator!.name}</p>
+                            <p className="type-pre-text text-text-tertiary">{b.creator!.title}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

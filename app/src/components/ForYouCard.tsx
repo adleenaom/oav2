@@ -21,13 +21,6 @@ export default function ForYouCard({ video, onClick }: ForYouCardProps) {
         </div>
       </div>
 
-      {/* Duration chip — Figma: px-8 py-4, right-4 */}
-      <div className="absolute bottom-1.5 right-1 bg-[rgba(32,32,32,0.8)] rounded-full px-2 py-1">
-        <span className="type-disclaimer text-text-on-dark">
-          {video.seriesCount} series · {video.totalMinutes}m
-        </span>
-      </div>
-
       {/* Title gradient — bottom overlay with padding */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 pb-2 pt-8">
         <span className="type-tags text-text-on-dark leading-tight line-clamp-2 block text-left text-[9px] md:text-[10px]">

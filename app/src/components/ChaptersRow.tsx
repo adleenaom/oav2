@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useBundleDetail } from '../hooks/useOAData';
+import { bundleUrl } from '../utils/slug';
 
 /**
  * ChaptersRow — horizontal scroll of series thumbnails for a bundle.
@@ -28,7 +29,7 @@ export default function ChaptersRow({ bundleId, size = 'small' }: ChaptersRowPro
       {seriesList.map((series) => (
         <button
           key={series.id}
-          onClick={() => navigate(`/bundle/${bundleId}`)}
+          onClick={() => navigate(bundleUrl(bundleId))}
           className={`card-interactive relative ${w} ${h} rounded-[8px] overflow-hidden shrink-0`}
         >
           <img

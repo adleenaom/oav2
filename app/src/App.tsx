@@ -41,9 +41,9 @@ function AppLayout() {
           {/* Core */}
           <Route path="/" element={<LearnHome />} />
           <Route path="/foryou/:index" element={<ForYouPlayer />} />
-          <Route path="/play/:bundleId/:chapterIndex" element={<ChapterPlayer />} />
-          <Route path="/bundle/:id" element={<BundleDetail />} />
-          <Route path="/lesson/:id" element={<LessonDetail />} />
+          <Route path="/play/:bundleSlug/:chapterIndex" element={<ChapterPlayer />} />
+          <Route path="/bundle/:slug" element={<BundleDetail />} />
+          <Route path="/lesson/:slug" element={<LessonDetail />} />
           <Route path="/viewall/:type" element={<ViewAll />} />
 
           {/* Auth */}
@@ -63,7 +63,7 @@ function AppLayout() {
           <Route path="/settings" element={<Settings />} />
 
           {/* Content */}
-          <Route path="/creator/:id" element={<CreatorProfile />} />
+          <Route path="/creator/:slug" element={<CreatorProfile />} />
           <Route path="/magazine" element={<Magazine />} />
           <Route path="/liked" element={<Liked />} />
 

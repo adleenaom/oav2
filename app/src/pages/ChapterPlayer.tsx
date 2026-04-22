@@ -5,13 +5,17 @@ import { useBundleDetail, usePlanDetail } from '../hooks/useOAData';
 import { useProgress } from '../hooks/useProgress';
 import { useCredits } from '../hooks/useCredits';
 import OAButton from '../components/OAButton';
+import CoinIcon from '../components/CoinIcon';
 import BundleThumbnail from '../components/BundleThumbnail';
 import { ChapterVideoPlayer } from '@/components/ui/chapter-video-player';
+import SurveyScreen from '../components/SurveyScreen';
+import { fromSlug, playUrl, bundleUrl } from '../utils/slug';
 
-type PlayerState = 'playing' | 'up-next' | 'end-of-bundle' | 'next-bundle' | 'locked';
+type PlayerState = 'playing' | 'survey' | 'up-next' | 'end-of-bundle' | 'next-bundle' | 'locked';
 
 export default function ChapterPlayer() {
-  const { bundleId, chapterIndex } = useParams<{ bundleId: string; chapterIndex: string }>();
+  const { bundleSlug, chapterIndex } = useParams<{ bundleSlug: string; chapterIndex: string }>();
+  const bundleId = bundleSlug ? String(fromSlug(bundleSlug)) : null;
   const navigate = useNavigate();
   const { trackChapterWatch, markChapterComplete, resetChapterProgress, getBundleProgress } = useProgress();
   const { credits, purchaseBundle, isBundleAccessible } = useCredits();
@@ -121,9 +125,50 @@ export default function ChapterPlayer() {
 
   // ---- Video ended → show "up next" or "end of bundle" ----
 
+  // After survey completes, proceed to next chapter or end-of-bundle
+  const handleSurveyComplete = useCallback(() => {
+    if (hasNext) {
+      setPlayerState('up-next');
+      setCountdown(5);
+      countdownRef.current = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(countdownRef.current);
+            goToChapter(currentIdx + 1);
+            return 5;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else if (nextPlanBundle && nextBundleAccessible) {
+      setPlayerState('next-bundle');
+      setCountdown(5);
+      countdownRef.current = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(countdownRef.current);
+            navigate(playUrl(nextPlanBundle.id, 0, nextPlanBundle.title));
+            return 5;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else if (nextPlanBundle && !nextBundleAccessible) {
+      setPlayerState('locked');
+    } else {
+      setPlayerState('end-of-bundle');
+    }
+  }, [hasNext, currentIdx, goToChapter, nextPlanBundle, nextBundleAccessible, navigate]);
+
   const handleVideoEnded = useCallback(() => {
     if (!currentChapter || !bundle) return;
     markChapterComplete(String(bundle.id), String(currentChapter.id));
+
+    // Show survey if chapter has assessments
+    if (currentChapter.assessments && currentChapter.assessments.length > 0) {
+      setPlayerState('survey');
+      return;
+    }
 
     if (hasNext) {
       // Check if next chapter is in a different bundle (lesson plan flow)
@@ -150,7 +195,7 @@ export default function ChapterPlayer() {
           setCountdown(prev => {
             if (prev <= 1) {
               clearInterval(countdownRef.current);
-              navigate(`/play/${nextPlanBundle.id}/0`);
+              navigate(playUrl(nextPlanBundle.id, 0, nextPlanBundle.title));
               return 5;
             }
             return prev - 1;
@@ -195,6 +240,18 @@ export default function ChapterPlayer() {
 
       {/* ---- Video Player (mobile + desktop) ---- */}
       <div className="relative w-full h-full">
+        {/* Survey screen — shown after video if chapter has assessments */}
+        {playerState === 'survey' && currentChapter.assessments.length > 0 && (
+          <SurveyScreen
+            bundleTitle={bundle.title}
+            partNumber={currentIdx + 1}
+            totalParts={chapters.length}
+            assessments={currentChapter.assessments}
+            onClose={() => navigate(-1)}
+            onComplete={handleSurveyComplete}
+          />
+        )}
+
         {/* ChapterVideoPlayer replaces raw <video> */}
         {playerState === 'playing' && (
           <ChapterVideoPlayer
@@ -253,14 +310,14 @@ export default function ChapterPlayer() {
                       alt={rec.title}
                       size="default"
                       price={rec.is_free ? 'free' : rec.credits_required}
-                      onClick={() => navigate(`/play/${rec.id}/0`)}
+                      onClick={() => navigate(playUrl(rec.id, 0, rec.title))}
                     />
                   ))}
                 </div>
               </div>
             )}
 
-            <OAButton variant="blue" size="medium" onClick={() => navigate(`/bundle/${bundleId}`)}>
+            <OAButton variant="blue" size="medium" onClick={() => navigate(bundleUrl(Number(bundleId)))}>
               Back to Bundle
             </OAButton>
           </div>
@@ -294,7 +351,7 @@ export default function ChapterPlayer() {
 
               {/* Countdown play button */}
               <button
-                onClick={() => { clearInterval(countdownRef.current); navigate(`/play/${nextPlanBundle.id}/0`); }}
+                onClick={() => { clearInterval(countdownRef.current); navigate(playUrl(nextPlanBundle.id, 0, nextPlanBundle.title)); }}
                 className="relative w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mt-4"
               >
                 <svg className="absolute inset-0 w-20 h-20 -rotate-90" viewBox="0 0 80 80">
@@ -309,13 +366,13 @@ export default function ChapterPlayer() {
               {/* Action buttons */}
               <div className="flex gap-4 mt-8 w-full max-w-[320px]">
                 <button
-                  onClick={() => { clearInterval(countdownRef.current); navigate(`/bundle/${bundleId}`); }}
+                  onClick={() => { clearInterval(countdownRef.current); navigate(bundleUrl(Number(bundleId))); }}
                   className="flex-1 py-3 rounded-[8px] bg-white/10 type-button text-white text-center"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={() => { clearInterval(countdownRef.current); navigate(`/play/${nextPlanBundle.id}/0`); }}
+                  onClick={() => { clearInterval(countdownRef.current); navigate(playUrl(nextPlanBundle.id, 0, nextPlanBundle.title)); }}
                   className="flex-1 py-3 rounded-[8px] bg-action-secondary type-button text-white text-center"
                 >
                   Play Now
@@ -332,7 +389,7 @@ export default function ChapterPlayer() {
             <p className="type-headline-large text-white text-center">{nextPlanBundle ? nextPlanBundle.title : 'Next bundle'} is locked</p>
             <p className="type-description text-white/50 text-center">Purchase this bundle to continue your lesson plan.</p>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-accent-yellow" />
+              <CoinIcon size={16} />
               <span className="type-headline-medium text-white">{credits} credits available</span>
             </div>
             {purchaseError && <p className="type-description text-accent-magenta">Not enough credits</p>}

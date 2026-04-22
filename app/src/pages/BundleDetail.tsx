@@ -9,15 +9,18 @@ import { useBundleDetail } from '../hooks/useOAData';
 import { useProgress } from '../hooks/useProgress';
 import { useCredits } from '../hooks/useCredits';
 import { useState } from 'react';
+import CoinIcon from '../components/CoinIcon';
+import { fromSlug, playUrl, lessonUrl } from '../utils/slug';
 
 type Tab = 'about' | 'chapters';
 
 export default function BundleDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
+  const id = slug ? String(fromSlug(slug)) : null;
   const navigate = useNavigate();
   const { getBundleProgress, getBundlePercentage } = useProgress();
   const { credits, isBundleAccessible } = useCredits();
-  const { bundle: oaBundle, seriesList, resolvedChapters, isLoading } = useBundleDetail(id ? Number(id) : null);
+  const { bundle: oaBundle, seriesList, resolvedChapters, resources, reviews, isLoading } = useBundleDetail(id ? Number(id) : null);
 
   const bundle = oaBundle ? {
     id: oaBundle.id,
@@ -56,7 +59,7 @@ export default function BundleDetail() {
   const handlePlayChapter = (chapterId: string) => {
     if (!hasAccess) return;
     const idx = bundle.chapters.findIndex(c => String(c.id) === chapterId);
-    navigate(`/play/${bundle.id}/${idx >= 0 ? idx : 0}`);
+    navigate(playUrl(bundle.id, idx >= 0 ? idx : 0, bundle.title));
   };
 
   const handleCTA = () => {
@@ -95,7 +98,7 @@ export default function BundleDetail() {
               {/* Credits badge */}
               <div className="absolute top-[52px] right-6 z-10">
                 <div className="bg-bg-elevated border border-border-input rounded-lg p-2 flex items-center gap-0.5 h-[34px]">
-                  <div className="w-3.5 h-3.5 rounded-full bg-accent-yellow" />
+                  <CoinIcon size={14} />
                   <span className="font-semibold text-[14px] text-text-primary leading-[20px] font-sans">{credits}</span>
                 </div>
               </div>
@@ -122,7 +125,7 @@ export default function BundleDetail() {
                 )}
                 {!isInProgress && !isCompleted && (
                   <div className="flex items-center gap-1">
-                    <div className="w-3.5 h-3.5 rounded-full bg-accent-yellow" />
+                    <CoinIcon size={14} />
                     <span className="font-semibold text-[14px] text-text-primary font-sans">
                       {bundle.isFree ? 'Free' : bundle.price.toLocaleString()}
                     </span>
@@ -162,20 +165,50 @@ export default function BundleDetail() {
           {activeTab === 'about' && (
             <div className="flex flex-col">
               {/* Resources */}
-              <div className="flex items-center gap-2 pl-4 pr-6 pt-6">
-                <BookOpen size={20} className="text-text-primary" />
-                <h2 className="type-display-medium text-text-primary">Resources</h2>
-              </div>
-              <div className="flex flex-col px-6 py-4">
-                <button className="flex items-center justify-between py-2 w-full text-left">
-                  <span className="type-body-default text-text-secondary">Reference Document</span>
-                  <Download size={20} className="text-text-secondary" />
-                </button>
-                <button className="flex items-center justify-between py-2 w-full text-left">
-                  <span className="type-body-default text-text-secondary">Intro to {bundle.title} Framework</span>
-                  <Download size={20} className="text-text-secondary" />
-                </button>
-              </div>
+              {resources.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2 pl-4 pr-6 pt-6">
+                    <BookOpen size={20} className="text-text-primary" />
+                    <h2 className="type-display-medium text-text-primary">Resources</h2>
+                  </div>
+                  <div className="flex flex-col px-6 py-4">
+                    {resources.map(r => (
+                      <div key={r.id} className="flex items-center justify-between py-2 w-full text-left">
+                        <span className="type-body-default text-text-secondary">{r.name}</span>
+                        <Download size={20} className="text-text-secondary" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="h-px bg-border-default" />
+                </>
+              )}
+
+              {/* Reviews */}
+              {reviews.length > 0 && (
+                <>
+                  <div className="px-6 pt-6 pb-2">
+                    <h3 className="type-display-medium text-text-primary">Reviews</h3>
+                  </div>
+                  <div className="flex flex-col gap-4 px-6 pb-6">
+                    {reviews.slice(0, 5).map(r => (
+                      <div key={r.id} className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-action-secondary/20 flex items-center justify-center shrink-0">
+                            <span className="text-[11px] font-bold text-action-secondary">{r.name.charAt(0)}</span>
+                          </div>
+                          <span className="type-headline-small text-text-primary">{r.name}</span>
+                          <div className="flex items-center gap-0.5 ml-auto">
+                            {Array.from({ length: r.rating }).map((_, i) => (
+                              <span key={i} className="text-[11px] text-accent-yellow">★</span>
+                            ))}
+                          </div>
+                        </div>
+                        <p className="type-body-default text-text-secondary">{r.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
 
               <div className="h-px bg-border-default" />
 
@@ -219,7 +252,7 @@ export default function BundleDetail() {
                     <h3 className="type-display-medium text-text-primary">
                       This bundle is part of a lesson plan
                     </h3>
-                    <OAButton variant="blue" size="medium" fullWidth onClick={() => navigate(`/lesson/${parentLesson.id}`)}>
+                    <OAButton variant="blue" size="medium" fullWidth onClick={() => navigate(lessonUrl(parentLesson.id))}>
                       View lesson plan
                     </OAButton>
                   </div>
@@ -230,11 +263,11 @@ export default function BundleDetail() {
 
           {activeTab === 'chapters' && (
             <div className="flex flex-col">
-              {bundle.chapters.map((chapter, idx) => {
+              {bundle.chapters.map((chapter) => {
                 const chId = String(chapter.id);
                 const done = completedChapters.includes(chId);
                 const isPlaying = false;
-                const isLocked = !hasAccess && idx > 0;
+                const isLocked = !hasAccess;
                 const hasSurvey = chapter.hasAssessment;
                 const isViewed = done;
                 const isGrayed = isViewed; // viewed chapters get gray-2 text
@@ -294,7 +327,7 @@ export default function BundleDetail() {
                           'type-body-default',
                           isGrayed ? 'text-text-tertiary' : 'text-text-secondary'
                         )}>
-                          {bundle.description.substring(0, 120)}...
+                          {chapter.description || bundle.description.substring(0, 120)}
                         </p>
                       </button>
                     </div>
@@ -337,15 +370,15 @@ export default function BundleDetail() {
       <div className="hidden md:flex flex-col flex-1 overflow-y-auto">
 
         {/* Hero header — blurred background + title + action bar */}
-        <div className="relative w-full min-h-[300px] bg-[#1a1a2e]">
+        <div className="relative w-full min-h-[300px] bg-[#1a1a2e] overflow-hidden">
           {/* Blurred background image */}
           <img
             src={bundle.thumbnail || bundle.chapters[0]?.seriesImage || ''}
             alt=""
-            className="absolute inset-0 w-full h-full object-cover scale-110 blur-[20px] brightness-[0.4]"
+            className="absolute inset-0 w-full h-full object-cover scale-110 blur-[20px] brightness-[0.6]"
             style={{ display: bundle.thumbnail || bundle.chapters[0]?.seriesImage ? 'block' : 'none' }}
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-black/70" />
+          <div className="absolute inset-0 bg-black/30" />
 
           {/* Hero content */}
           <div className="container-content relative z-10 flex flex-col justify-end min-h-[300px] pt-6 pb-8">
@@ -384,7 +417,7 @@ export default function BundleDetail() {
               </button>
               {!hasAccess && (
                 <div className="flex items-center gap-1.5 ml-auto">
-                  <div className="w-4 h-4 rounded-full bg-accent-yellow" />
+                  <CoinIcon size={16} />
                   <span className="type-headline-small text-white">{bundle.price}</span>
                   <span className="type-description text-white/60">credits</span>
                 </div>
@@ -410,7 +443,7 @@ export default function BundleDetail() {
                 {bundle.chapters.map((chapter, idx) => {
                   const chId = String(chapter.id);
                   const done = completedChapters.includes(chId);
-                  const isLocked = !hasAccess && idx > 0;
+                  const isLocked = !hasAccess;
                   const hasSurvey = chapter.hasAssessment;
                   const isViewed = done;
                   const isGrayed = isViewed || isLocked;
@@ -475,7 +508,7 @@ export default function BundleDetail() {
                           'type-body-default line-clamp-2',
                           isGrayed ? 'text-text-tertiary' : 'text-text-secondary'
                         )}>
-                          {bundle.description.substring(0, 120)}...
+                          {chapter.description || bundle.description.substring(0, 120)}
                         </p>
                       </div>
                     </button>
@@ -511,19 +544,47 @@ export default function BundleDetail() {
                 </div>
               )}
 
-              <div className="bg-bg-secondary rounded-[16px] p-6">
-                <h3 className="type-headline-small text-text-primary mb-3">Resources</h3>
-                <div className="flex flex-col gap-1">
-                  <button className="flex items-center justify-between py-2 rounded-lg hover:bg-white/50 transition-colors px-2 -mx-2">
-                    <span className="type-description text-text-secondary">Reference Document</span>
-                    <Download size={16} className="text-text-tertiary" />
-                  </button>
-                  <button className="flex items-center justify-between py-2 rounded-lg hover:bg-white/50 transition-colors px-2 -mx-2">
-                    <span className="type-description text-text-secondary">Framework Guide</span>
-                    <Download size={16} className="text-text-tertiary" />
-                  </button>
+              {/* Resources card — from API */}
+              {resources.length > 0 && (
+                <div className="bg-bg-secondary rounded-[16px] p-6">
+                  <h3 className="type-headline-small text-text-primary mb-3">Resources</h3>
+                  <div className="flex flex-col gap-1">
+                    {resources.map(r => (
+                      <div key={r.id} className="flex items-center justify-between py-2 px-2 -mx-2 rounded-lg">
+                        <span className="type-description text-text-secondary">{r.name}</span>
+                        <Download size={16} className="text-text-tertiary" />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Reviews card */}
+              {reviews.length > 0 && (
+                <div className="bg-bg-secondary rounded-[16px] p-6">
+                  <h3 className="type-headline-small text-text-primary mb-4">Reviews</h3>
+                  <div className="flex flex-col gap-4">
+                    {reviews.slice(0, 3).map(r => (
+                      <div key={r.id} className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-action-secondary/20 flex items-center justify-center shrink-0">
+                            <span className="text-[10px] font-bold text-action-secondary">{r.name.charAt(0)}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="type-pre-text text-text-primary font-semibold truncate">{r.name}</p>
+                          </div>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            {Array.from({ length: r.rating }).map((_, i) => (
+                              <span key={i} className="text-[10px] text-accent-yellow">★</span>
+                            ))}
+                          </div>
+                        </div>
+                        <p className="type-pre-text text-text-secondary line-clamp-2">{r.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {bundle.creator && (
                 <div className="bg-bg-secondary rounded-[16px] p-6">
@@ -540,7 +601,7 @@ export default function BundleDetail() {
 
               {parentLesson && (
                 <button
-                  onClick={() => navigate(`/lesson/${parentLesson.id}`)}
+                  onClick={() => navigate(lessonUrl(parentLesson.id))}
                   className="bg-action-secondary/10 rounded-[16px] p-6 text-left hover:bg-action-secondary/15 transition-colors"
                 >
                   <p className="type-pre-text text-action-secondary mb-1">Part of a lesson plan</p>

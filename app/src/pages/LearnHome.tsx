@@ -5,15 +5,15 @@ import SectionHeader from '../components/SectionHeader';
 import BundleThumbnail from '../components/BundleThumbnail';
 import ForYouCard from '../components/ForYouCard';
 import LessonCard from '../components/LessonCard';
-import OAButton from '../components/OAButton';
 import PurchaseModal from '../components/PurchaseModal';
 import { useHomepage } from '../hooks/useHomepage';
 import { useProgress } from '../hooks/useProgress';
 import { useBundleNavigation } from '../hooks/useBundleNavigation';
+import { lessonUrl, bundleUrl } from '../utils/slug';
 
 export default function LearnHome() {
   const navigate = useNavigate();
-  const { forYou, plans, series, isLoading } = useHomepage();
+  const { forYou, plans, discoverBundles, isLoading } = useHomepage();
   const { getPercentage, getContinueWatching, removeFromContinueWatching } = useProgress();
   const { modalBundle, closeModal } = useBundleNavigation();
 
@@ -63,7 +63,7 @@ export default function LearnHome() {
                     { label: 'Remove', onClick: () => removeFromContinueWatching(item.id) },
                   ];
                   if (item.planId) {
-                    actions.push({ label: 'Go to lessons', onClick: () => navigate(`/lesson/${item.planId}`) });
+                    actions.push({ label: 'Go to lessons', onClick: () => navigate(lessonUrl(Number(item.planId))) });
                   }
                   return (
                     <BundleThumbnail
@@ -72,7 +72,7 @@ export default function LearnHome() {
                       alt={item.chapterTitle}
                       size="big"
                       progress={item.percentage}
-                      onClick={() => navigate(item.type === 'lesson' ? `/lesson/${item.id}` : `/bundle/${item.id}`)}
+                      onClick={() => navigate(item.type === 'lesson' ? lessonUrl(Number(item.id)) : bundleUrl(Number(item.id)))}
                       menuActions={actions}
                     />
                   );
@@ -141,7 +141,7 @@ export default function LearnHome() {
                       learningPoints: plan.learnings || [],
                       certificateOnCompletion: true,
                     }}
-                    onClick={() => navigate(`/lesson/${plan.id}`)}
+                    onClick={() => navigate(lessonUrl(plan.id, plan.title))}
                   />
                 ))}
               </div>
@@ -149,8 +149,8 @@ export default function LearnHome() {
           </div>
         )}
 
-        {/* OpenAcademy Originals */}
-        {series.length > 0 && (
+        {/* OpenAcademy Originals — one card per bundle, first series image */}
+        {discoverBundles.length > 0 && (
           <div className="bg-bg-base section">
             <div className="container-content">
               <h2 className="type-display-large text-text-brand section-heading-gap">
@@ -158,22 +158,19 @@ export default function LearnHome() {
               </h2>
 
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 card-grid-gap">
-                {series.map(s => (
+                {discoverBundles.map(db => (
                   <BundleThumbnail
-                    key={s.id}
-                    thumbnail={s.image}
-                    alt={s.title}
+                    key={db.bundleId}
+                    thumbnail={db.allSeries[0]?.image || ''}
+                    alt={db.bundleTitle}
                     size="big"
-                    progress={getPercentage(String(s.id)) || undefined}
-                    onClick={() => s.bundle ? navigate(`/bundle/${s.bundle.id}`) : navigate(`/bundle/${s.id}`)}
+                    progress={getPercentage(String(db.bundleId)) || undefined}
+                    onClick={() => navigate(bundleUrl(db.bundleId, db.bundleTitle))}
                     className="w-full h-auto aspect-[3/4]"
                   />
                 ))}
               </div>
 
-              <div className="flex justify-center mt-8 md:mt-10">
-                <OAButton variant="primary" size="medium">View More</OAButton>
-              </div>
             </div>
           </div>
         )}

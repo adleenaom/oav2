@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useCredits } from '../hooks/useCredits';
 import { useLikes } from '../hooks/useLikes';
 import { cn } from '@/lib/utils';
+import CoinIcon from './CoinIcon';
 
 const tabs = [
   { id: 'learn', label: 'Learn', path: '/' },
@@ -118,7 +119,7 @@ export default function TopNav() {
               {/* Credits badge */}
               <div className="flex items-center gap-2">
                 <div className="bg-bg-secondary rounded-lg px-3 py-1.5 flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-accent-yellow" />
+                  <CoinIcon size={12} />
                   <span className="type-description font-semibold text-text-primary">{credits}</span>
                 </div>
 

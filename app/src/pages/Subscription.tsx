@@ -3,6 +3,7 @@ import { ChevronLeft } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useCredits } from '../hooks/useCredits';
 import OAButton from '../components/OAButton';
+import CoinIcon from '../components/CoinIcon';
 
 const PACKAGES = [
   { id: 1, credits: 100, price: 'RM 9.90', popular: false },
@@ -27,7 +28,7 @@ export default function Subscription() {
             <h1 className="type-headline-large text-text-primary md:text-[24px]">Top Up Credits</h1>
             {isLoggedIn && (
               <div className="flex items-center gap-2 mt-2">
-                <div className="w-4 h-4 rounded-full bg-accent-yellow" />
+                <CoinIcon size={16} />
                 <span className="type-headline-small text-text-primary">{credits}</span>
                 <span className="type-description text-text-tertiary">current balance</span>
               </div>
@@ -45,7 +46,7 @@ export default function Subscription() {
                   <span className="absolute -top-3 left-6 bg-action-secondary text-white type-tags px-3 py-1 rounded-full">Most Popular</span>
                 )}
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-5 h-5 rounded-full bg-accent-yellow" />
+                  <CoinIcon size={20} />
                   <span className="type-headline-large text-text-primary">{pkg.credits.toLocaleString()}</span>
                   <span className="type-description text-text-tertiary">credits</span>
                 </div>

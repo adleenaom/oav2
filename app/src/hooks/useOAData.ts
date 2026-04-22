@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getPlans, getSeries, getBundles, getCreators, getChapters, getContents, type OAPlan, type OASeries, type OABundle, type OACreator, type OAContent } from '../services/oa-api';
+import { getPlans, getSeries, getBundles, getCreators, getChapters, getContents, getResources, getReviews, type OAPlan, type OASeries, type OABundle, type OACreator, type OAContent, type OAResource, type OAReview, type OAAssessmentContent } from '../services/oa-api';
 
 /** Fetch a single plan by ID */
 export function usePlan(id: number | null) {
@@ -65,7 +65,7 @@ export function useCreator(id: number | null) {
   return { data, isLoading };
 }
 
-/** A fully resolved chapter with video URL */
+/** A fully resolved chapter with video URL and assessments */
 export interface ResolvedChapter {
   id: number;
   seriesId: number;
@@ -80,6 +80,7 @@ export interface ResolvedChapter {
   videoImage: string;
   durationMinutes: number;
   hasAssessment: boolean;
+  assessments: OAAssessmentContent[];
 }
 
 /** Fetch series detail + resolve chapters + content/videos for a bundle detail page */
@@ -87,6 +88,8 @@ export function useBundleDetail(bundleId: number | null) {
   const [bundle, setBundle] = useState<OABundle | null>(null);
   const [seriesList, setSeriesList] = useState<OASeries[]>([]);
   const [resolvedChapters, setResolvedChapters] = useState<ResolvedChapter[]>([]);
+  const [resources, setResources] = useState<OAResource[]>([]);
+  const [reviews, setReviews] = useState<OAReview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -120,6 +123,24 @@ export function useBundleDetail(bundleId: number | null) {
           }
         }
 
+        // Resolve assessment content for chapters that have them
+        const allAssessmentContentIds = chapters.flatMap(ch => (ch.assessments || []).map(a => a.id));
+        let assessmentContents: OAAssessmentContent[] = [];
+        if (allAssessmentContentIds.length > 0) {
+          try {
+            const res = await getContents(allAssessmentContentIds);
+            assessmentContents = res.filter(c => c.type === 'assessment') as unknown as OAAssessmentContent[];
+          } catch {}
+        }
+
+        // Build map: chapterId → assessment contents
+        const assessmentsByChapter = new Map<number, OAAssessmentContent[]>();
+        for (const a of assessmentContents) {
+          const existing = assessmentsByChapter.get(a.chapterId) || [];
+          existing.push(a);
+          assessmentsByChapter.set(a.chapterId, existing);
+        }
+
         // Build resolved chapters in series order
         const rChapters: ResolvedChapter[] = [];
         for (const s of resolved) {
@@ -130,6 +151,7 @@ export function useBundleDetail(bundleId: number | null) {
 
           for (const ch of sChapters) {
             const content = contentByChapter.get(ch.id);
+            const chAssessments = assessmentsByChapter.get(ch.id) || [];
             rChapters.push({
               id: ch.id,
               seriesId: s.id,
@@ -143,18 +165,37 @@ export function useBundleDetail(bundleId: number | null) {
               videoUrl: (content?.video?.source || '').replace('https://app.theopenacademy.org', ''),
               videoImage: content?.video?.image || content?.image || s.image,
               durationMinutes: content?.video?.durationMinutes || 0,
-              hasAssessment: (ch.assessments || []).length > 0,
+              hasAssessment: chAssessments.length > 0,
+              assessments: chAssessments.sort((a, b) => a.seqNo - b.seqNo),
             });
           }
         }
 
-        setResolvedChapters(rChapters);
+        // Exclude test-only chapters (no video, only assessment)
+        const videoChapters = rChapters.filter(ch => ch.videoUrl || !ch.hasAssessment);
+        setResolvedChapters(videoChapters);
+
+        // Resolve resources from series
+        const allResourceIds = resolved.flatMap(s => (s.resources || []).map(r => r.id));
+        if (allResourceIds.length > 0) {
+          try {
+            const resolvedResources = await getResources(allResourceIds);
+            setResources(resolvedResources);
+          } catch {}
+        }
+
+        // Fetch reviews (global pool — fetch first 10)
+        try {
+          const resolvedReviews = await getReviews([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+          setReviews(resolvedReviews);
+        } catch {}
+
         setIsLoading(false);
       })
       .catch((e) => { console.warn('useBundleDetail error:', e); setIsLoading(false); });
   }, [bundleId]);
 
-  return { bundle, seriesList, resolvedChapters, isLoading };
+  return { bundle, seriesList, resolvedChapters, resources, reviews, isLoading };
 }
 
 /** Fetch plan detail + resolve bundles for lesson detail page */

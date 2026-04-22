@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import OAButton from './OAButton';
+import CoinIcon from './CoinIcon';
 import ChaptersRow from './ChaptersRow';
 import { useCredits } from '../hooks/useCredits';
 import type { ApiBundleSummary } from '../services/types';
+import { bundleUrl } from '../utils/slug';
 
 type ModalState = 'overview' | 'success' | 'error';
 
@@ -116,7 +118,7 @@ export default function PurchaseModal({ bundle, isOpen, onClose }: PurchaseModal
                 state={purchasing || !canAfford ? 'disabled' : 'default'}
                 onClick={handlePurchase}
               >
-                {purchasing ? 'Processing...' : isFree ? 'ADD TO MY LEARNING  |  FREE' : `ADD TO MY LEARNING  |  🪙 ${bundle.credits_required}`}
+                {purchasing ? 'Processing...' : isFree ? 'ADD TO MY LEARNING  |  FREE' : <span className="flex items-center justify-center gap-1">ADD TO MY LEARNING  |  <CoinIcon size={14} /> {bundle.credits_required}</span>}
               </OAButton>
             </div>
           </div>
@@ -136,7 +138,7 @@ export default function PurchaseModal({ bundle, isOpen, onClose }: PurchaseModal
               </p>
             </div>
 
-            <OAButton variant="primary" size="medium" fullWidth onClick={() => { handleClose(); navigate(`/bundle/${bundle.id}`); }}>
+            <OAButton variant="primary" size="medium" fullWidth onClick={() => { handleClose(); navigate(bundleUrl(bundle.id, bundle.title)); }}>
               Go to Bundle
             </OAButton>
 

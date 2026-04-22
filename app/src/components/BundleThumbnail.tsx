@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Check, MoreVertical } from 'lucide-react';
+import CoinIcon from './CoinIcon';
 
 /*
  * BundleThumbnail — Figma node 4423:32728
@@ -125,7 +126,7 @@ export default function BundleThumbnail({
               <span className="type-button text-bg-secondary">FREE</span>
             ) : (
               <div className="flex items-center gap-0.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-accent-yellow" />
+                <CoinIcon size={10} />
                 <span className="type-button text-bg-secondary">{price}</span>
               </div>
             )}

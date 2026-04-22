@@ -7,6 +7,7 @@ import Breadcrumb from '../components/Breadcrumb';
 import { useHomepage } from '../hooks/useHomepage';
 import { useProgress } from '../hooks/useProgress';
 import { getLearnListings, getDailyVideos, type OADailyVideo } from '../services/oa-api';
+import { lessonUrl, bundleUrl } from '../utils/slug';
 
 type ViewType = 'continue' | 'foryou' | 'lessons';
 
@@ -90,7 +91,7 @@ export default function ViewAll() {
                   { label: 'Remove', onClick: () => removeFromContinueWatching(item.id) },
                 ];
                 if (item.planId) {
-                  actions.push({ label: 'Go to lessons', onClick: () => navigate(`/lesson/${item.planId}`) });
+                  actions.push({ label: 'Go to lessons', onClick: () => navigate(lessonUrl(Number(item.planId))) });
                 }
                 return (
                   <BundleThumbnail
@@ -99,7 +100,7 @@ export default function ViewAll() {
                     alt={item.chapterTitle}
                     size="big"
                     progress={item.percentage}
-                    onClick={() => navigate(item.type === 'lesson' ? `/lesson/${item.id}` : `/bundle/${item.id}`)}
+                    onClick={() => navigate(item.type === 'lesson' ? lessonUrl(Number(item.id)) : bundleUrl(Number(item.id)))}
                     className="w-full h-auto aspect-[3/4]"
                     menuActions={actions}
                   />
@@ -140,7 +141,7 @@ export default function ViewAll() {
                     certificateOnCompletion: true,
                   }}
                   progress={getPercentage(String(plan.id)) || undefined}
-                  onClick={() => navigate(`/lesson/${plan.id}`)}
+                  onClick={() => navigate(lessonUrl(plan.id, plan.title))}
                   className="w-full"
                 />
               ))}
@@ -169,7 +170,7 @@ export default function ViewAll() {
               {continueWatching.map(item => (
                 <button
                   key={`${item.type}-${item.id}`}
-                  onClick={() => navigate(item.type === 'lesson' ? `/lesson/${item.id}` : `/bundle/${item.id}`)}
+                  onClick={() => navigate(item.type === 'lesson' ? lessonUrl(Number(item.id)) : bundleUrl(Number(item.id)))}
                   className="card-interactive relative aspect-[3/4] rounded-[8px] overflow-hidden"
                 >
                   <img src={item.thumbnail} alt={item.chapterTitle} className="absolute inset-0 w-full h-full object-cover" />
@@ -230,7 +231,7 @@ export default function ViewAll() {
                     certificateOnCompletion: true,
                   }}
                   progress={getPercentage(String(plan.id)) || undefined}
-                  onClick={() => navigate(`/lesson/${plan.id}`)}
+                  onClick={() => navigate(lessonUrl(plan.id, plan.title))}
                   className="w-full"
                 />
               ))}

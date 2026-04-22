@@ -8,8 +8,10 @@ import { useLikes } from '../hooks/useLikes';
 import SectionHeader from '../components/SectionHeader';
 import BundleThumbnail from '../components/BundleThumbnail';
 import OAButton from '../components/OAButton';
+import CoinIcon from '../components/CoinIcon';
 import { apiPost } from '../services/api';
 import { getBundles, getPlans, type OABundle, type OAPlan } from '../services/oa-api';
+import { lessonUrl, bundleUrl } from '../utils/slug';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -98,7 +100,7 @@ export default function Profile() {
             {/* Credits bar */}
             <div className="flex items-center gap-3 mt-5 p-4 bg-bg-base rounded-[12px]">
               <div className="w-8 h-8 rounded-full bg-accent-yellow/20 flex items-center justify-center">
-                <div className="w-4 h-4 rounded-full bg-accent-yellow" />
+                <CoinIcon size={16} />
               </div>
               <div className="flex-1">
                 <span className="type-headline-medium text-text-primary">{credits}</span>
@@ -120,7 +122,7 @@ export default function Profile() {
               <div ref={continueRef} className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
                 {continueWatching.map(item => {
                   const actions = [{ label: 'Remove', onClick: () => removeFromContinueWatching(item.id) }];
-                  if (item.planId) actions.push({ label: 'Go to lessons', onClick: () => navigate(`/lesson/${item.planId}`) });
+                  if (item.planId) actions.push({ label: 'Go to lessons', onClick: () => navigate(lessonUrl(Number(item.planId))) });
                   return (
                     <BundleThumbnail
                       key={`${item.type}-${item.id}`}
@@ -128,7 +130,7 @@ export default function Profile() {
                       alt={item.chapterTitle}
                       size="big"
                       progress={item.percentage}
-                      onClick={() => navigate(item.type === 'lesson' ? `/lesson/${item.id}` : `/bundle/${item.id}`)}
+                      onClick={() => navigate(item.type === 'lesson' ? lessonUrl(Number(item.id)) : bundleUrl(Number(item.id)))}
                       menuActions={actions}
                     />
                   );
@@ -148,7 +150,7 @@ export default function Profile() {
                 {myPlans.map(plan => (
                   <button
                     key={`plan-${plan.id}`}
-                    onClick={() => navigate(`/lesson/${plan.id}`)}
+                    onClick={() => navigate(lessonUrl(plan.id, plan.title))}
                     className="flex items-center gap-4 p-4 rounded-[12px] bg-bg-secondary hover:bg-gray-4/20 transition-colors text-left"
                   >
                     <div className="w-14 h-14 rounded-[8px] overflow-hidden bg-bg-base shrink-0">
@@ -165,7 +167,7 @@ export default function Profile() {
                 {myBundles.map(bundle => (
                   <button
                     key={`bundle-${bundle.id}`}
-                    onClick={() => navigate(`/bundle/${bundle.id}`)}
+                    onClick={() => navigate(bundleUrl(bundle.id, bundle.title))}
                     className="flex items-center gap-4 p-4 rounded-[12px] bg-bg-secondary hover:bg-gray-4/20 transition-colors text-left"
                   >
                     <div className="w-14 h-14 rounded-[8px] bg-action-secondary/10 flex items-center justify-center shrink-0">
