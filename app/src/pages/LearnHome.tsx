@@ -6,10 +6,11 @@ import BundleThumbnail from '../components/BundleThumbnail';
 import ForYouCard from '../components/ForYouCard';
 import LessonCard from '../components/LessonCard';
 import PurchaseModal from '../components/PurchaseModal';
+import { HomepageSkeleton } from '../components/Skeleton';
 import { useHomepage } from '../hooks/useHomepage';
 import { useProgress } from '../hooks/useProgress';
 import { useBundleNavigation } from '../hooks/useBundleNavigation';
-import { lessonUrl, bundleUrl } from '../utils/slug';
+import { lessonUrl, bundleUrl, playUrl } from '../utils/slug';
 
 export default function LearnHome() {
   const navigate = useNavigate();
@@ -22,14 +23,6 @@ export default function LearnHome() {
   const lessonsRef = useRef<HTMLDivElement>(null);
 
   const continueWatching = getContinueWatching();
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="type-body-default text-text-tertiary">Loading...</div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col h-full">
@@ -52,8 +45,11 @@ export default function LearnHome() {
           </div>
         </div>
 
+        {/* Skeleton while loading */}
+        {isLoading && <HomepageSkeleton />}
+
         {/* Continue Watching */}
-        {continueWatching.length > 0 && (
+        {!isLoading && continueWatching.length > 0 && (
           <div className="bg-bg-base section-tight">
             <div className="container-content">
               <SectionHeader title="Continue Watching" onSeeAll={() => navigate('/viewall/continue')} scrollRef={continueRef} />
@@ -69,10 +65,10 @@ export default function LearnHome() {
                     <BundleThumbnail
                       key={`${item.type}-${item.id}`}
                       thumbnail={item.thumbnail}
-                      alt={item.chapterTitle}
+                      alt={`${item.title} — ${item.chapterTitle}`}
                       size="big"
                       progress={item.percentage}
-                      onClick={() => navigate(item.type === 'lesson' ? lessonUrl(Number(item.id)) : bundleUrl(Number(item.id)))}
+                      onClick={() => navigate(playUrl(Number(item.id), 0, item.title))}
                       menuActions={actions}
                     />
                   );
@@ -83,7 +79,7 @@ export default function LearnHome() {
         )}
 
         {/* For You */}
-        {forYou.length > 0 && (
+        {!isLoading && forYou.length > 0 && (
           <div className="bg-bg-base section-tight">
             <div className="container-content">
               <SectionHeader title="For You" onSeeAll={() => navigate('/viewall/foryou')} scrollRef={forYouRef} />
@@ -113,7 +109,7 @@ export default function LearnHome() {
         )}
 
         {/* Explore Lessons */}
-        {plans.length > 0 && (
+        {!isLoading && plans.length > 0 && (
           <div className="bg-bg-base section-tight">
             <div className="container-content">
               <SectionHeader title="Explore Lessons" onSeeAll={() => navigate('/viewall/lessons')} scrollRef={lessonsRef} />

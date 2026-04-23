@@ -102,9 +102,12 @@ export function useBundleDetail(bundleId: number | null) {
         if (!b) { setIsLoading(false); return; }
         setBundle(b);
 
-        // Resolve series
+        // Resolve series — preserve bundle's order
         const seriesIds = (b.series || []).map(s => s.id);
-        const resolved = seriesIds.length > 0 ? await getSeries(seriesIds) : [];
+        const fetchedSeries = seriesIds.length > 0 ? await getSeries(seriesIds) : [];
+        const resolved = seriesIds
+          .map(id => fetchedSeries.find(s => s.id === id))
+          .filter(Boolean) as OASeries[];
         setSeriesList(resolved);
 
         // Resolve all chapters from all series
@@ -214,11 +217,15 @@ export function usePlanDetail(planId: number | null) {
         if (!p) { setIsLoading(false); return; }
         setPlan(p);
 
-        // Resolve bundles
+        // Resolve bundles — preserve plan's order
         const bundleIds = (p.bundles || []).map(b => b.id);
         if (bundleIds.length > 0) {
           const resolved = await getBundles(bundleIds);
-          setPlanBundles(resolved);
+          // Reorder to match plan's bundle order (API doesn't preserve input order)
+          const ordered = bundleIds
+            .map(id => resolved.find(b => b.id === id))
+            .filter(Boolean) as OABundle[];
+          setPlanBundles(ordered);
         }
         setIsLoading(false);
       })

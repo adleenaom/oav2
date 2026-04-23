@@ -249,91 +249,57 @@ export async function getDiscoverListing(size = 10) {
 
 /** Convenience: get homepage with full data resolved */
 export async function getHomepageData() {
-  const listings = await getLearnListings(10);
+  // Step 1: Fetch both listings in parallel
+  const [listings, lessonListing] = await Promise.all([
+    getLearnListings(10),
+    getLessonsListing(10).catch(() => ({ lessons: [] as OAListingRef[], suggested: [] as OAListingRef[] })),
+  ]);
 
-  // Resolve ForYou videos
-  let forYouVideos: OADailyVideo[] = [];
-  try {
-    const forYouIds = (listings.forYou || []).map(r => r.id);
-    forYouVideos = await getDailyVideos(forYouIds);
-  } catch (e) { console.warn('Failed to load forYou:', e); }
+  // Step 2: Resolve ForYou, plans, and series ALL in parallel
+  const forYouIds = (listings.forYou || []).map(r => r.id);
+  const planIds = (lessonListing.lessons || []).map(r => r.id);
+  const seriesIds = [...new Set([
+    ...(listings.recommended || []).filter(r => r.type === 'series').map(r => r.id),
+    ...(listings.trending || []).filter(r => r.type === 'series').map(r => r.id),
+  ])];
 
-  // Resolve lesson plan IDs
-  let plans: OAPlan[] = [];
-  try {
-    const lessonListing = await getLessonsListing(10);
-    const planIds = (lessonListing.lessons || []).map(r => r.id);
-    plans = planIds.length > 0 ? await getPlans(planIds) : [];
-  } catch (e) { console.warn('Failed to load plans:', e); }
-
-  // Resolve trending/recommended series
-  let series: OASeries[] = [];
-  try {
-    const seriesIds = [
-      ...(listings.recommended || []).filter(r => r.type === 'series').map(r => r.id),
-      ...(listings.trending || []).filter(r => r.type === 'series').map(r => r.id),
-    ];
-    const uniqueSeriesIds = [...new Set(seriesIds)];
-    series = uniqueSeriesIds.length > 0 ? await getSeries(uniqueSeriesIds) : [];
-  } catch (e) { console.warn('Failed to load series:', e); }
-
-  // For Discover page: resolve ALL series in each bundle so we can show all chapter thumbnails
-  // Group the fetched series by bundle, then fetch the full bundle to get all its series
-  let discoverBundles: { bundleId: number; bundleTitle: string; bundleDescription: string; creditsRequired: number; durationMinutes: number; chapterCount: number; allSeries: OASeries[] }[] = [];
-  try {
-    const bundleIds = [...new Set(series.filter(s => s.bundle).map(s => s.bundle!.id))];
-    if (bundleIds.length > 0) {
-      const bundles = await getBundles(bundleIds);
-      // For each bundle, get ALL its series (not just the ones in the homepage listing)
-      const allSeriesIds = bundles.flatMap(b => (b.series || []).map(s => s.id));
-      const uniqueAllSeriesIds = [...new Set(allSeriesIds)];
-      const allSeries = uniqueAllSeriesIds.length > 0 ? await getSeries(uniqueAllSeriesIds) : [];
-
-      // Identify test-only series (chapters with only assessments, no video content)
-      const allChapterIds = allSeries.flatMap(s => (s.chapters || []).map(ch => ch.id));
-      let testOnlySeriesIds = new Set<number>();
-      if (allChapterIds.length > 0) {
-        try {
-          const chapters = await getChapters(allChapterIds);
-          // A series is test-only if ALL its chapters have assessments but no content
-          for (const s of allSeries) {
-            const sChapterIds = (s.chapters || []).map(ch => ch.id);
-            const sChapters = chapters.filter(ch => sChapterIds.includes(ch.id));
-            const isTestOnly = sChapters.length > 0 && sChapters.every(ch =>
-              (ch.assessments || []).length > 0 && (ch.contents || []).length === 0
-            );
-            if (isTestOnly) testOnlySeriesIds.add(s.id);
-          }
-        } catch {}
-      }
-
-      for (const b of bundles) {
-        const bSeriesIds = (b.series || []).map(s => s.id);
-        // Sort to match bundle's series order, exclude test-only series
-        const bSeries = bSeriesIds
-          .filter(id => !testOnlySeriesIds.has(id))
-          .map(id => allSeries.find(s => s.id === id))
-          .filter(Boolean) as OASeries[];
-        const videoChapterCount = bSeriesIds.filter(id => !testOnlySeriesIds.has(id)).length;
-        discoverBundles.push({
-          bundleId: b.id,
-          bundleTitle: b.title,
-          bundleDescription: b.description,
-          creditsRequired: b.creditsRequired,
-          durationMinutes: b.durationMinutes,
-          chapterCount: videoChapterCount,
-          allSeries: bSeries,
-        });
-      }
-    }
-    // Standalone series (no bundle) are excluded — they don't have a valid bundle page
-  } catch (e) { console.warn('Failed to resolve discover bundles:', e); }
+  const [forYouVideos, plans, series] = await Promise.all([
+    forYouIds.length > 0 ? getDailyVideos(forYouIds).catch(() => [] as OADailyVideo[]) : Promise.resolve([] as OADailyVideo[]),
+    planIds.length > 0 ? getPlans(planIds).catch(() => [] as OAPlan[]) : Promise.resolve([] as OAPlan[]),
+    seriesIds.length > 0 ? getSeries(seriesIds).catch(() => [] as OASeries[]) : Promise.resolve([] as OASeries[]),
+  ]);
 
   return {
     forYou: forYouVideos,
     plans,
     series,
-    discoverBundles,
-    listings,
   };
+}
+
+/** Resolve discover bundles separately */
+export async function resolveDiscoverBundles(series: OASeries[]) {
+  const bundleIds = [...new Set(series.filter(s => s.bundle).map(s => s.bundle!.id))];
+  if (bundleIds.length === 0) return [];
+
+  const bundles = await getBundles(bundleIds);
+  const allSeriesIds = [...new Set(bundles.flatMap(b => (b.series || []).map(s => s.id)))];
+  const allSeries = allSeriesIds.length > 0 ? await getSeries(allSeriesIds) : [];
+
+  const result: { bundleId: number; bundleTitle: string; bundleDescription: string; creditsRequired: number; durationMinutes: number; chapterCount: number; allSeries: OASeries[] }[] = [];
+  for (const b of bundles) {
+    const bSeriesIds = (b.series || []).map(s => s.id);
+    const bSeries = bSeriesIds
+      .map(id => allSeries.find(s => s.id === id))
+      .filter(Boolean) as OASeries[];
+    result.push({
+      bundleId: b.id,
+      bundleTitle: b.title,
+      bundleDescription: b.description,
+      creditsRequired: b.creditsRequired,
+      durationMinutes: b.durationMinutes,
+      chapterCount: bSeries.length,
+      allSeries: bSeries,
+    });
+  }
+  return result;
 }

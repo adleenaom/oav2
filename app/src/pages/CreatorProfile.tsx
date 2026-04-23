@@ -1,16 +1,23 @@
+import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Globe, BookOpen } from 'lucide-react';
 import { useCreator } from '../hooks/useOAData';
 import BundleThumbnail from '../components/BundleThumbnail';
 import Breadcrumb from '../components/Breadcrumb';
-import { bundleUrl } from '../utils/slug';
-
-// Creator detail type is resolved from useCreator hook
+import { fromSlug, toSlug, bundleUrl } from '../utils/slug';
 
 export default function CreatorProfile() {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
+  const id = slug ? String(fromSlug(slug)) : null;
   const navigate = useNavigate();
   const { data: oaCreator, isLoading } = useCreator(id ? Number(id) : null);
+
+  // Correct URL to include slug
+  useEffect(() => {
+    if (!oaCreator || !slug) return;
+    const correctSlug = toSlug(oaCreator.id, oaCreator.name);
+    if (slug !== correctSlug) navigate(`/creator/${correctSlug}`, { replace: true });
+  }, [oaCreator, slug, navigate]);
   const creator = oaCreator ? {
     ...oaCreator,
     job_title: oaCreator.jobTitle,

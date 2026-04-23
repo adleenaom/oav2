@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import TopNav from './components/TopNav';
+import SideNav from './components/SideNav';
 import BottomNav from './components/BottomNav';
 import { AuthProvider } from './hooks/useAuth';
 
@@ -34,9 +34,12 @@ function AppLayout() {
   const hideChrome = isFullscreen || isAuthPage;
 
   return (
-    <div className="h-full relative flex flex-col">
-      {!hideChrome && <TopNav />}
-      <div className="flex-1 min-h-0 relative">
+    <div className="h-full relative flex flex-row">
+      {/* Desktop side nav */}
+      {!hideChrome && <SideNav />}
+      {/* Main content */}
+      <div className="flex-1 min-h-0 min-w-0 relative flex flex-col">
+        <div className="flex-1 min-h-0 relative">
         <Routes>
           {/* Core */}
           <Route path="/" element={<LearnHome />} />
@@ -80,6 +83,7 @@ function AppLayout() {
           <Route path="/become-creator" element={<BecomeCreator />} />
         </Routes>
         {!hideChrome && <BottomNav />}
+        </div>
       </div>
     </div>
   );

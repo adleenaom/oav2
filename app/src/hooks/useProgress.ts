@@ -38,14 +38,16 @@ interface ProgressStore {
   hiddenFromContinue?: string[];  // bundle/plan IDs hidden from Continue Watching
 }
 
-const STORAGE_KEY = 'oa_progress_v2';
+const STORAGE_KEY = 'oa_progress_v3';
 
 function load(): ProgressStore {
   try {
+    // Clear stale v2 data
+    if (localStorage.getItem('oa_progress_v2')) localStorage.removeItem('oa_progress_v2');
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : { bundles: {}, foryou: {}, hiddenFromContinue: [] };
   } catch {
-    return { bundles: {}, foryou: {} };
+    return { bundles: {}, foryou: {}, hiddenFromContinue: [] };
   }
 }
 
@@ -70,8 +72,11 @@ export function useProgress() {
     setStore(prev => {
       const existing = prev.bundles[params.bundleId];
       const completedChapters = existing?.completedChapters ?? [];
+      // Un-hide this bundle if it was previously removed from Continue Watching
+      const hiddenFromContinue = (prev.hiddenFromContinue || []).filter(id => id !== params.bundleId);
       const next: ProgressStore = {
         ...prev,
+        hiddenFromContinue,
         bundles: {
           ...prev.bundles,
           [params.bundleId]: {
@@ -191,9 +196,10 @@ export function useProgress() {
     const allBundles = Object.values(store.bundles);
 
     // Standalone bundles (NOT part of a lesson)
+    // Show if user has started watching (lastWatchedAt > 0) and not fully complete
     allBundles
       .filter(b => b.planId === null || b.planId === undefined)
-      .filter(b => b.completedChapters.length > 0 && b.completedChapters.length < b.totalChapters)
+      .filter(b => b.completedChapters.length < b.totalChapters)
       .filter(b => !hidden.has(b.bundleId))
       .forEach(b => {
         items.push({
@@ -203,12 +209,15 @@ export function useProgress() {
           title: b.bundleTitle,
           thumbnail: b.lastChapterThumbnail,
           chapterTitle: b.lastChapterTitle,
-          percentage: Math.round((b.completedChapters.length / b.totalChapters) * 100),
+          percentage: b.totalChapters > 0
+            ? Math.round((b.completedChapters.length / b.totalChapters) * 100)
+            : 0,
           lastWatchedAt: b.lastWatchedAt,
         });
       });
 
     // Lesson plans: group bundles by planId
+    // Show the LATEST watched bundle to represent the lesson plan
     const lessonBundles = allBundles.filter(b => b.planId !== null && b.planId !== undefined);
     const planGroups: Record<string, BundleProgress[]> = {};
     for (const b of lessonBundles) {
@@ -218,25 +227,29 @@ export function useProgress() {
     }
 
     for (const [planId, bundles] of Object.entries(planGroups)) {
-      if (hidden.has(planId)) continue;
-
       const totalChapters = bundles.reduce((sum, b) => sum + b.totalChapters, 0);
       const completedChapters = bundles.reduce((sum, b) => sum + b.completedChapters.length, 0);
 
-      // Skip if no progress or fully complete
-      if (completedChapters === 0 || completedChapters >= totalChapters) continue;
+      // Skip if fully complete
+      if (totalChapters > 0 && completedChapters >= totalChapters) continue;
 
       // Find the most recently watched bundle in this plan
-      const latest = bundles.sort((a, b) => b.lastWatchedAt - a.lastWatchedAt)[0];
+      const latest = [...bundles].sort((a, b) => b.lastWatchedAt - a.lastWatchedAt)[0];
 
+      // Skip if hidden (check both planId and latest bundleId)
+      if (hidden.has(planId) || hidden.has(latest.bundleId)) continue;
+
+      // Use the latest bundle's ID so clicking goes to the bundle, not the lesson page
       items.push({
-        id: planId,
-        type: 'lesson',
+        id: latest.bundleId,
+        type: 'bundle',
         planId,
-        title: `Lesson Plan`,
+        title: latest.bundleTitle,
         thumbnail: latest.lastChapterThumbnail,
         chapterTitle: latest.lastChapterTitle,
-        percentage: Math.round((completedChapters / totalChapters) * 100),
+        percentage: totalChapters > 0
+          ? Math.round((completedChapters / totalChapters) * 100)
+          : 1,
         lastWatchedAt: latest.lastWatchedAt,
       });
     }

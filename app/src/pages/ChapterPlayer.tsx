@@ -9,7 +9,7 @@ import CoinIcon from '../components/CoinIcon';
 import BundleThumbnail from '../components/BundleThumbnail';
 import { ChapterVideoPlayer } from '@/components/ui/chapter-video-player';
 import SurveyScreen from '../components/SurveyScreen';
-import { fromSlug, playUrl, bundleUrl } from '../utils/slug';
+import { fromSlug, toSlug, playUrl, bundleUrl } from '../utils/slug';
 
 type PlayerState = 'playing' | 'survey' | 'up-next' | 'end-of-bundle' | 'next-bundle' | 'locked';
 
@@ -22,6 +22,15 @@ export default function ChapterPlayer() {
 
   const { bundle: oaBundle, seriesList, resolvedChapters } = useBundleDetail(bundleId ? Number(bundleId) : null);
   const { planBundles: parentPlanBundles } = usePlanDetail(oaBundle?.plan?.id || null);
+
+  // Correct URL slug
+  useEffect(() => {
+    if (!oaBundle || !bundleSlug || !chapterIndex) return;
+    const correctSlug = toSlug(oaBundle.id, oaBundle.title);
+    if (bundleSlug !== correctSlug) {
+      navigate(`/play/${correctSlug}/${chapterIndex}`, { replace: true });
+    }
+  }, [oaBundle, bundleSlug, chapterIndex, navigate]);
 
   const bundle = oaBundle ? {
     id: oaBundle.id,
@@ -98,7 +107,7 @@ export default function ChapterPlayer() {
   // ---- Auto-play on chapter change + track progress ----
 
   useEffect(() => {
-    if (!currentChapter || !bundle) return;
+    if (!currentChapter || !bundle || chapters.length === 0) return;
 
     // Reset if rewatching a completed chapter
     if (isCompleted) {
@@ -112,7 +121,7 @@ export default function ChapterPlayer() {
       planId: bundle.plan_id ? String(bundle.plan_id) : null,
       totalChapters: chapters.length,
       chapterId: String(currentChapter.id),
-      chapterThumbnail: currentChapter.videoImage || currentChapter.seriesImage || bundle.thumbnail,
+      chapterThumbnail: currentChapter.seriesImage || currentChapter.videoImage || bundle.thumbnail,
       chapterTitle: currentChapter.title,
     });
 
@@ -121,7 +130,7 @@ export default function ChapterPlayer() {
       videoRef.current.load();
       videoRef.current.play().catch(() => {});
     }
-  }, [currentIdx, bundle?.id]);
+  }, [currentIdx, bundle?.id, chapters.length]);
 
   // ---- Video ended → show "up next" or "end of bundle" ----
 
@@ -263,6 +272,10 @@ export default function ChapterPlayer() {
             totalParts={chapters.length}
             duration={currentChapter.duration}
             skipTimestamp={5}
+            hasNext={hasNext}
+            hasPrev={currentIdx > 0}
+            onNext={() => goToChapter(currentIdx + 1)}
+            onPrev={() => goToChapter(currentIdx - 1)}
             onClose={() => navigate(-1)}
             onEnded={handleVideoEnded}
           />

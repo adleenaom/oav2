@@ -57,8 +57,8 @@ export default function BundleThumbnail({
   // If className provides its own sizing (e.g. w-full), skip default fixed sizes
   const hasCustomSize = className.includes('w-full') || className.includes('w-[');
   const { w, h } = hasCustomSize ? { w: '', h: '' } : sizeMap[size];
-  const isNotStarted = progress === undefined || progress === 0;
-  const isInProgress = progress !== undefined && progress > 0 && progress < 100;
+  const isNotStarted = progress === undefined;
+  const isInProgress = progress !== undefined && progress < 100;
   const isCompleted = progress === 100;
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -80,7 +80,8 @@ export default function BundleThumbnail({
     <div className={`relative shrink-0 ${w} ${h} ${className}`}>
       <button
         onClick={onClick}
-        className={`card-interactive relative rounded-[8px] overflow-hidden w-full h-full`}
+        title={alt}
+        className={`card-interactive relative rounded-[8px] overflow-hidden w-full h-full cursor-pointer`}
       >
         {/* Image — fills entire card */}
         <img
@@ -92,17 +93,21 @@ export default function BundleThumbnail({
         {/* In-progress overlay */}
         {isInProgress && (
           <>
-            <div className="absolute inset-0 bg-black/30" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="type-headline-medium text-text-on-dark">
-                {progress}%
-              </span>
-            </div>
-            {/* Progress bar */}
-            <div className="absolute bottom-0 left-[-3px] right-0 h-[7px]">
+            {progress > 0 && (
+              <>
+                <div className="absolute inset-0 bg-black/20" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="type-headline-medium text-text-on-dark">
+                    {progress}%
+                  </span>
+                </div>
+              </>
+            )}
+            {/* Progress bar — YouTube-style thin bar at bottom */}
+            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/20">
               <div
-                className="bg-accent-blue h-full rounded-l-none"
-                style={{ width: getBarWidth(progress) }}
+                className="bg-accent-blue h-full transition-all"
+                style={{ width: progress > 0 ? getBarWidth(progress) : '2%' }}
               />
             </div>
           </>
@@ -111,10 +116,12 @@ export default function BundleThumbnail({
         {/* Completed overlay */}
         {isCompleted && (
           <>
-            <div className="absolute inset-0 bg-black/30" />
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-              <Check size={18} className="text-text-on-dark" strokeWidth={3} />
-              <span className="type-tags text-text-on-dark">Completed</span>
+            <div className="absolute inset-0 bg-black/40" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                <Check size={20} className="text-white" strokeWidth={3} />
+              </div>
+              <span className="type-button text-white text-[11px] tracking-wider">COMPLETED</span>
             </div>
           </>
         )}

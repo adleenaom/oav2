@@ -2,7 +2,7 @@ import * as React from "react"
 import Hls from "hls.js"
 import { cn } from "@/lib/utils"
 import { getAuthHeaders } from "@/services/api"
-import { X, Pause, Play, Volume2, VolumeX, Settings, Subtitles } from "lucide-react"
+import { X, Pause, Play, Volume2, VolumeX, Settings, Subtitles, ChevronUp, ChevronDown } from "lucide-react"
 
 /**
  * ChapterVideoPlayer — Figma node 8985:39676
@@ -24,7 +24,11 @@ interface ChapterVideoPlayerProps {
   partNumber: number
   totalParts: number
   duration?: string
-  skipTimestamp?: number // seconds to skip intro to (default 5)
+  skipTimestamp?: number
+  hasNext?: boolean
+  hasPrev?: boolean
+  onNext?: () => void
+  onPrev?: () => void
   onClose: () => void
   onEnded: () => void
   className?: string
@@ -40,6 +44,10 @@ function ChapterVideoPlayer({
   partNumber,
   totalParts,
   skipTimestamp = 5,
+  hasNext = false,
+  hasPrev = false,
+  onNext,
+  onPrev,
   onClose,
   onEnded,
   className,
@@ -57,7 +65,48 @@ function ChapterVideoPlayer({
   const [showCCMenu, setShowCCMenu] = React.useState(false)
   const [selectedCC, setSelectedCC] = React.useState<typeof CC_OPTIONS[number]>('Off')
   const [showSkip, setShowSkip] = React.useState(true)
+  const [slideDir, setSlideDir] = React.useState<'up' | 'down' | null>(null)
   const controlsTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined)
+  const touchStartY = React.useRef(0)
+  const touchEndY = React.useRef(0)
+
+  // Swipe navigation (mobile)
+  const handleTouchStart = React.useCallback((e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY
+    touchEndY.current = e.touches[0].clientY
+  }, [])
+
+  const handleTouchMove = React.useCallback((e: React.TouchEvent) => {
+    touchEndY.current = e.touches[0].clientY
+  }, [])
+
+  const handleTouchEnd = React.useCallback(() => {
+    const diff = touchStartY.current - touchEndY.current
+    if (diff > 80 && hasNext && onNext) {
+      setSlideDir('up')
+      setTimeout(() => { onNext(); setSlideDir(null) }, 300)
+    } else if (diff < -80 && hasPrev && onPrev) {
+      setSlideDir('down')
+      setTimeout(() => { onPrev(); setSlideDir(null) }, 300)
+    }
+  }, [hasNext, hasPrev, onNext, onPrev])
+
+  // Keyboard nav
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown' && hasNext && onNext) {
+        e.preventDefault()
+        setSlideDir('up')
+        setTimeout(() => { onNext(); setSlideDir(null) }, 300)
+      } else if (e.key === 'ArrowUp' && hasPrev && onPrev) {
+        e.preventDefault()
+        setSlideDir('down')
+        setTimeout(() => { onPrev(); setSlideDir(null) }, 300)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [hasNext, hasPrev, onNext, onPrev])
 
   // Auto-hide controls
   const resetControlsTimer = React.useCallback(() => {
@@ -321,12 +370,35 @@ function ChapterVideoPlayer({
     </>
   )
 
+  // Slide animation classes
+  const slideClass = slideDir === 'up'
+    ? 'animate-[slideOutUp_300ms_ease-in-out_forwards]'
+    : slideDir === 'down'
+    ? 'animate-[slideOutDown_300ms_ease-in-out_forwards]'
+    : 'animate-[slideInUp_400ms_cubic-bezier(0.34,1.56,0.64,1)_forwards]'
+
   return (
     <div
       className={cn("fixed inset-0 z-[100] bg-black flex items-center justify-center", className)}
       onClick={resetControlsTimer}
     >
-      {/* Desktop close button — outside video container */}
+      {/* Slide animation keyframes */}
+      <style>{`
+        @keyframes slideInUp {
+          from { transform: translateY(100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes slideOutUp {
+          from { transform: translateY(0); opacity: 1; }
+          to { transform: translateY(-100%); opacity: 0; }
+        }
+        @keyframes slideOutDown {
+          from { transform: translateY(0); opacity: 1; }
+          to { transform: translateY(100%); opacity: 0; }
+        }
+      `}</style>
+
+      {/* Desktop close button */}
       <button
         onClick={onClose}
         className="hidden md:flex absolute top-6 right-6 z-[110] w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 items-center justify-center transition-colors"
@@ -334,12 +406,43 @@ function ChapterVideoPlayer({
         <X size={22} className="text-white" />
       </button>
 
+      {/* Desktop nav arrows — right side */}
+      {(hasNext || hasPrev) && (
+        <div className="hidden md:flex absolute right-6 top-1/2 -translate-y-1/2 z-[110] flex-col items-center gap-3">
+          <button
+            onClick={() => { if (hasPrev && onPrev) { setSlideDir('down'); setTimeout(() => { onPrev(); setSlideDir(null) }, 300) } }}
+            disabled={!hasPrev}
+            className={cn(
+              "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+              hasPrev ? "bg-white/10 hover:bg-white/20 text-white" : "bg-white/5 text-white/20 pointer-events-none"
+            )}
+          >
+            <ChevronUp size={20} />
+          </button>
+          <span className="type-pre-text text-white/40 tabular-nums">{partNumber}/{totalParts}</span>
+          <button
+            onClick={() => { if (hasNext && onNext) { setSlideDir('up'); setTimeout(() => { onNext(); setSlideDir(null) }, 300) } }}
+            disabled={!hasNext}
+            className={cn(
+              "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+              hasNext ? "bg-white/10 hover:bg-white/20 text-white" : "bg-white/5 text-white/20 pointer-events-none"
+            )}
+          >
+            <ChevronDown size={20} />
+          </button>
+        </div>
+      )}
+
       {/* Video container — full-screen on mobile, centered 9:16 on desktop */}
       <div
-        className="relative w-full h-full md:w-auto md:h-auto md:rounded-2xl md:overflow-hidden md:shrink-0"
-        style={{
-          // Desktop only: constrain to 9:16 aspect ratio
-        }}
+        className={cn(
+          "relative w-full h-full md:w-auto md:h-auto md:rounded-2xl md:overflow-hidden md:shrink-0",
+          slideClass
+        )}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{}}
       >
         {/* Desktop sizing wrapper */}
         <div

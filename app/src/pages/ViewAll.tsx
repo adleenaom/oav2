@@ -4,6 +4,7 @@ import { ChevronLeft } from 'lucide-react';
 import BundleThumbnail from '../components/BundleThumbnail';
 import LessonCard from '../components/LessonCard';
 import Breadcrumb from '../components/Breadcrumb';
+import { SkeletonGrid } from '../components/Skeleton';
 import { useHomepage } from '../hooks/useHomepage';
 import { useProgress } from '../hooks/useProgress';
 import { getLearnListings, getDailyVideos, type OADailyVideo } from '../services/oa-api';
@@ -58,8 +59,11 @@ export default function ViewAll() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="type-body-default text-text-tertiary">Loading...</div>
+      <div className="flex flex-col h-full bg-bg-base">
+        <div className="flex-1 overflow-y-auto">
+          <div className="bg-bg-secondary"><div className="container-content py-8"><div className="animate-pulse bg-bg-secondary h-8 w-40 rounded" /></div></div>
+          <div className="container-content section-tight"><SkeletonGrid /></div>
+        </div>
       </div>
     );
   }

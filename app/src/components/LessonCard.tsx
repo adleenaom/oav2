@@ -13,6 +13,7 @@ export default function LessonCard({ lesson, progress, onClick, className }: Les
   return (
     <button
       onClick={onClick}
+      title={lesson.fullTitle || lesson.title}
       className={cn(
         "card-interactive bg-bg-elevated border border-border-card rounded-[12px] overflow-hidden shrink-0 text-left flex flex-col",
         className || "w-[257px] md:w-[300px]"

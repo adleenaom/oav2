@@ -8,9 +8,10 @@ import { cn } from '@/lib/utils';
 import { useBundleDetail } from '../hooks/useOAData';
 import { useProgress } from '../hooks/useProgress';
 import { useCredits } from '../hooks/useCredits';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import CoinIcon from '../components/CoinIcon';
-import { fromSlug, playUrl, lessonUrl } from '../utils/slug';
+import { BundleDetailSkeleton } from '../components/Skeleton';
+import { fromSlug, toSlug, playUrl, lessonUrl } from '../utils/slug';
 
 type Tab = 'about' | 'chapters';
 
@@ -47,14 +48,31 @@ export default function BundleDetail() {
   const [purchaseError] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
+  // Correct URL to include slug if only ID was provided
+  useEffect(() => {
+    if (!oaBundle || !slug) return;
+    const correctSlug = toSlug(oaBundle.id, oaBundle.title);
+    if (slug !== correctSlug) {
+      navigate(`/bundle/${correctSlug}`, { replace: true });
+    }
+  }, [oaBundle, slug, navigate]);
+
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><div className="type-body-default text-text-tertiary">Loading...</div></div>;
+    return <div className="flex flex-col h-full bg-bg-base"><div className="flex-1 overflow-y-auto"><BundleDetailSkeleton /></div></div>;
   }
   if (!bundle) { navigate('/'); return null; }
 
   const isInProgress = percentage > 0 && percentage < 100;
   const isCompleted = percentage === 100;
   const hasAccess = isBundleAccessible(bundle.id, bundle.isFree);
+
+  // Sort chapters: incomplete first, completed last
+  const sortedChapters = [...bundle.chapters].sort((a, b) => {
+    const aDone = completedChapters.includes(String(a.id));
+    const bDone = completedChapters.includes(String(b.id));
+    if (aDone === bDone) return 0;
+    return aDone ? 1 : -1;
+  });
 
   const handlePlayChapter = (chapterId: string) => {
     if (!hasAccess) return;
@@ -263,7 +281,7 @@ export default function BundleDetail() {
 
           {activeTab === 'chapters' && (
             <div className="flex flex-col">
-              {bundle.chapters.map((chapter) => {
+              {sortedChapters.map((chapter) => {
                 const chId = String(chapter.id);
                 const done = completedChapters.includes(chId);
                 const isPlaying = false;
@@ -440,7 +458,7 @@ export default function BundleDetail() {
             <div className="flex-1 min-w-0">
               <h2 className="type-headline-large text-text-primary mb-5">Chapters ({bundle.chapters.length})</h2>
               <div className="flex flex-col">
-                {bundle.chapters.map((chapter, idx) => {
+                {sortedChapters.map((chapter, idx) => {
                   const chId = String(chapter.id);
                   const done = completedChapters.includes(chId);
                   const isLocked = !hasAccess;

@@ -10,6 +10,7 @@ export default function ForYouCard({ video, onClick }: ForYouCardProps) {
   return (
     <button
       onClick={onClick}
+      title={video.title}
       className="card-interactive relative w-[100px] h-[150px] md:w-[140px] md:h-[200px] rounded-[8px] overflow-hidden shrink-0"
     >
       <img src={video.thumbnail} alt={video.title} className="absolute inset-0 w-full h-full object-cover" />

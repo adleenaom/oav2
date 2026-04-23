@@ -10,7 +10,8 @@ import { usePlanDetail } from '../hooks/useOAData';
 import { useProgress } from '../hooks/useProgress';
 import { useCredits } from '../hooks/useCredits';
 import CoinIcon from '../components/CoinIcon';
-import { fromSlug, bundleUrl, playUrl } from '../utils/slug';
+import { BundleDetailSkeleton } from '../components/Skeleton';
+import { fromSlug, toSlug, bundleUrl, playUrl } from '../utils/slug';
 
 const TABS = ['About', 'Lesson Bundles', 'Certificates', 'Instructors'] as const;
 type Tab = typeof TABS[number];
@@ -62,13 +63,22 @@ export default function LessonDetail() {
     })),
   } : null;
 
-  // Redirect home if plan not found (must be in useEffect, not during render)
+  // Redirect home if plan not found
   useEffect(() => {
     if (!isLoading && !oaPlan) navigate('/');
   }, [isLoading, oaPlan, navigate]);
 
+  // Correct URL to include slug if only ID was provided
+  useEffect(() => {
+    if (!oaPlan || !slug) return;
+    const correctSlug = toSlug(oaPlan.id, oaPlan.title);
+    if (slug !== correctSlug) {
+      navigate(`/lesson/${correctSlug}`, { replace: true });
+    }
+  }, [oaPlan, slug, navigate]);
+
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><div className="type-body-default text-text-tertiary">Loading...</div></div>;
+    return <div className="flex flex-col h-full bg-bg-base"><div className="flex-1 overflow-y-auto"><BundleDetailSkeleton /></div></div>;
   }
   if (!lesson) return null;
 
