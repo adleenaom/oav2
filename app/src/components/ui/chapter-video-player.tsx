@@ -40,7 +40,7 @@ const CC_OPTIONS = ['Off', 'English', '中文', 'Bahasa Melayu'] as const
 function ChapterVideoPlayer({
   videoUrl,
   posterImage,
-  bundleTitle,
+  bundleTitle: _bundleTitle,
   chapterTitle,
   partNumber,
   totalParts,
