@@ -165,7 +165,7 @@ export function useBundleDetail(bundleId: number | null) {
               duration: ch.duration,
               seqNo: ch.seqNo,
               isPremium: ch.isPremium,
-              videoUrl: (content?.video?.source || '').replace('https://app.theopenacademy.org', ''),
+              videoUrl: content?.video?.source || '',
               videoImage: content?.video?.image || content?.image || s.image,
               durationMinutes: content?.video?.durationMinutes || 0,
               hasAssessment: chAssessments.length > 0,

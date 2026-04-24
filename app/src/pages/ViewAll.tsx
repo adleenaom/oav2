@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import BundleThumbnail from '../components/BundleThumbnail';
+import ForYouCard from '../components/ForYouCard';
 import LessonCard from '../components/LessonCard';
 import Breadcrumb from '../components/Breadcrumb';
 import { SkeletonGrid } from '../components/Skeleton';
@@ -113,15 +114,18 @@ export default function ViewAll() {
             </div>
           )}
 
-          {/* For You — 2 column grid using BundleThumbnail for consistent sizing */}
+          {/* For You — grid using ForYouCard */}
           {viewType === 'foryou' && (
-            <div className="grid grid-cols-2 gap-1 px-6 py-4">
+            <div className="grid grid-cols-3 gap-2 px-6 py-4">
               {forYou.map((video, index) => (
-                <BundleThumbnail
+                <ForYouCard
                   key={video.id}
-                  thumbnail={video.video?.image || ''}
-                  alt={video.title}
-                  size="big"
+                  video={{
+                    id: video.id, type: 'foryou', title: video.title, fullTitle: video.title,
+                    category: '', description: '', keywords: [],
+                    seriesCount: 0, totalMinutes: video.video.durationMinutes,
+                    thumbnail: video.video.image, videoUrl: video.video.source,
+                  }}
                   onClick={() => navigate(`/foryou/${index}`)}
                   className="w-full h-auto aspect-[3/4]"
                 />
@@ -194,23 +198,23 @@ export default function ViewAll() {
             </div>
           )}
 
-          {/* For You — responsive 9:16 vertical video grid */}
+          {/* For You — responsive grid using ForYouCard */}
           {viewType === 'foryou' && (
             <>
               {forYou.length > 0 ? (
-                <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                <div className="grid grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
                   {forYou.map((video, index) => (
-                    <button
+                    <ForYouCard
                       key={video.id}
+                      video={{
+                        id: video.id, type: 'foryou', title: video.title, fullTitle: video.title,
+                        category: '', description: '', keywords: [],
+                        seriesCount: 0, totalMinutes: video.video.durationMinutes,
+                        thumbnail: video.video.image, videoUrl: video.video.source,
+                      }}
                       onClick={() => navigate(`/foryou/${index}`)}
-                      className="card-interactive relative aspect-[9/16] rounded-[12px] overflow-hidden bg-bg-secondary"
-                    >
-                      <img src={video.video?.image || ''} alt={video.title} className="absolute inset-0 w-full h-full object-cover" />
-                      <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent" />
-                      <div className="absolute bottom-0 left-0 right-0 p-3">
-                        <p className="type-description text-white font-semibold line-clamp-2">{video.title}</p>
-                      </div>
-                    </button>
+                      className="w-full h-auto aspect-[3/4]"
+                    />
                   ))}
                 </div>
               ) : (

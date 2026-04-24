@@ -30,7 +30,7 @@ export default function PurchaseModal({ bundle, isOpen, onClose }: PurchaseModal
 
   const handlePurchase = async () => {
     setPurchasing(true);
-    const success = await purchaseBundle(bundle.id, bundle.credits_required);
+    const success = await purchaseBundle(bundle.id, bundle.credits_required, bundle.title);
     setPurchasing(false);
     if (success) {
       setState('success');

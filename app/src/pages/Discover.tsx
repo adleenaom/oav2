@@ -1,54 +1,145 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search as SearchIcon } from 'lucide-react';
+import { Search as SearchIcon, ArrowUp } from 'lucide-react';
 import SectionHeader from '../components/SectionHeader';
 import LessonCard from '../components/LessonCard';
-import BundleThumbnail from '../components/BundleThumbnail';
 import PurchaseModal from '../components/PurchaseModal';
-import { useHomepage, type DiscoverBundle } from '../hooks/useHomepage';
+import { useHomepage } from '../hooks/useHomepage';
 import { useCredits } from '../hooks/useCredits';
 import { apiPost } from '../services/api';
 import { getSeries, getBundles, getCreators, type OABundle, type OACreator, type OASeries, type OAPlan } from '../services/oa-api';
 import type { ApiBundleSummary } from '../services/types';
 import { bundleUrl, lessonUrl, creatorUrl } from '../utils/slug';
 
+/** Resolved bundle with its series for display */
+interface DiscoverBundleRow {
+  bundle: OABundle;
+  series: OASeries[];
+}
+
+const BATCH_SIZE = 3;
+
 export default function Discover() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const { plans, discoverBundles } = useHomepage();
+  const { plans } = useHomepage();
   const { isBundleAccessible } = useCredits();
   const lessonsScrollRef = useRef<HTMLDivElement>(null);
   const bundleScrollRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const [modalBundle, setModalBundle] = useState<ApiBundleSummary | null>(null);
 
+  // Paginated bundle loading
+  const [allBundleIds, setAllBundleIds] = useState<number[]>([]);
+  const [bundleRows, setBundleRows] = useState<DiscoverBundleRow[]>([]);
+  const [loadedCount, setLoadedCount] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const scrollSentinelRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+
+  // Fetch all bundle IDs once
+  useEffect(() => {
+    apiPost<{ items: { id: number }[] }>('/v3/bundles/search', { query: '', size: 100, index: 0 })
+      .then(res => {
+        const ids = (res.items || []).map(i => i.id);
+        setAllBundleIds(ids);
+        setHasMore(ids.length > 0);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Load a batch of bundles with their series
+  const loadBatch = useCallback(async () => {
+    if (loadingMore || !hasMore || allBundleIds.length === 0) return;
+    setLoadingMore(true);
+
+    const batchIds = allBundleIds.slice(loadedCount, loadedCount + BATCH_SIZE);
+    if (batchIds.length === 0) {
+      setHasMore(false);
+      setLoadingMore(false);
+      return;
+    }
+
+    try {
+      const bundles = await getBundles(batchIds);
+      // Resolve series for each bundle
+      const allSeriesIds = [...new Set(bundles.flatMap(b => (b.series || []).map(s => s.id)))];
+      const allSeries = allSeriesIds.length > 0 ? await getSeries(allSeriesIds) : [];
+
+      const newRows: DiscoverBundleRow[] = bundles.map(b => {
+        const bSeriesIds = (b.series || []).map(s => s.id);
+        const bSeries = bSeriesIds
+          .map(id => allSeries.find(s => s.id === id))
+          .filter(Boolean) as OASeries[];
+        return { bundle: b, series: bSeries };
+      });
+
+      setBundleRows(prev => [...prev, ...newRows]);
+      setLoadedCount(prev => prev + batchIds.length);
+      setHasMore(loadedCount + batchIds.length < allBundleIds.length);
+    } catch {}
+    setLoadingMore(false);
+  }, [allBundleIds, loadedCount, loadingMore, hasMore]);
+
+  // Load first batch when IDs arrive
+  useEffect(() => {
+    if (allBundleIds.length > 0 && loadedCount === 0) loadBatch();
+  }, [allBundleIds]);
+
+  // Back to top visibility
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const onScroll = () => setShowBackToTop(el.scrollTop > 400);
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Infinite scroll — load more when sentinel is visible
+  useEffect(() => {
+    const sentinel = scrollSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      entries => { if (entries[0].isIntersecting && hasMore && !loadingMore) loadBatch(); },
+      { rootMargin: '200px' }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, loadBatch]);
+
   /** Handle clicking a bundle section — modal if locked, navigate if accessible */
-  const handleBundleClick = (db: DiscoverBundle) => {
-    const isFree = db.creditsRequired === 0;
-    if (isBundleAccessible(db.bundleId, isFree)) {
-      navigate(bundleUrl(db.bundleId, db.bundleTitle));
+  const handleBundleClick = (row: DiscoverBundleRow) => {
+    const b = row.bundle;
+    const isFree = b.creditsRequired === 0;
+    if (isBundleAccessible(b.id, isFree)) {
+      navigate(bundleUrl(b.id, b.title));
     } else {
       setModalBundle({
-        id: db.bundleId,
-        plan_id: null,
-        title: db.bundleTitle,
+        id: b.id,
+        plan_id: b.plan?.id || null,
+        title: b.title,
         subtitle: '',
-        description: db.bundleDescription,
+        description: b.description,
         category: '',
-        credits_required: db.creditsRequired,
-        duration_minutes: db.durationMinutes,
+        credits_required: b.creditsRequired,
+        duration_minutes: b.durationMinutes,
         is_free: isFree,
-        thumbnail: db.allSeries[0]?.image || '',
-        chapter_count: db.chapterCount,
+        thumbnail: row.series[0]?.image || '',
+        chapter_count: (b.series || []).length,
         creator: null,
       });
     }
   };
 
-  // Search — parallel search across bundles, creators, and learn-search (series)
+  // Search — bundles and creators only
   const [searchResults, setSearchResults] = useState<{
-    plans: OAPlan[];
-    bundles: OABundle[];
-    series: OASeries[];
+    lessons: OAPlan[];
+    bundles: { bundle: OABundle; thumbnail: string }[];
     creators: OACreator[];
   } | null>(null);
   const isSearching = query.length >= 2;
@@ -57,45 +148,46 @@ export default function Discover() {
     if (!isSearching) { setSearchResults(null); return; }
     const timer = setTimeout(async () => {
       try {
-        // Search all types in parallel
-        const [bundleRes, creatorRes, learnRes] = await Promise.all([
-          apiPost<{ items: { id: number }[] }>('/v3/bundles/search', { query, size: 10, index: 0 }).catch(() => ({ items: [] })),
+        const [bundleRes, creatorRes] = await Promise.all([
+          apiPost<{ items: { id: number }[] }>('/v3/bundles/search', { query, size: 12, index: 0 }).catch(() => ({ items: [] })),
           apiPost<{ items: { id: number }[] }>('/v3/creators/search', { query, size: 6, index: 0 }).catch(() => ({ items: [] })),
-          apiPost<{ items: { id: number; type: string }[] }>('/v3/listings/learn-search', { query, size: 20, index: 0 }).catch(() => ({ items: [] })),
         ]);
 
-        // Extract IDs by type from learn-search
-        const seriesIds = (learnRes.items || []).filter(r => r.type === 'series').map(r => r.id);
         const bundleIds = (bundleRes.items || []).map(r => r.id);
         const creatorIds = (creatorRes.items || []).map(r => r.id);
 
-        // Also match plans locally by title (no plans/search endpoint)
+        // Match lesson plans locally by title
         const queryLower = query.toLowerCase();
-        const matchedPlans = plans.filter(p => p.title.toLowerCase().includes(queryLower));
+        const matchedLessons = plans.filter(p => p.title.toLowerCase().includes(queryLower));
 
-        // Resolve full objects in parallel
-        const [resolvedBundles, resolvedSeries, resolvedCreators] = await Promise.all([
+        const [resolvedBundles, resolvedCreators] = await Promise.all([
           bundleIds.length > 0 ? getBundles(bundleIds) : Promise.resolve([]),
-          seriesIds.length > 0 ? getSeries(seriesIds) : Promise.resolve([]),
           creatorIds.length > 0 ? getCreators(creatorIds) : Promise.resolve([]),
         ]);
 
+        // Resolve first series image for each bundle thumbnail
+        const allFirstSeriesIds = resolvedBundles.map(b => b.series?.[0]?.id).filter(Boolean) as number[];
+        const firstSeries = allFirstSeriesIds.length > 0 ? await getSeries(allFirstSeriesIds) : [];
+        const seriesImageMap = new Map(firstSeries.map(s => [s.id, s.image]));
+
         setSearchResults({
-          plans: matchedPlans,
-          bundles: resolvedBundles,
-          series: resolvedSeries,
+          lessons: matchedLessons,
+          bundles: resolvedBundles.map(b => ({
+            bundle: b,
+            thumbnail: seriesImageMap.get(b.series?.[0]?.id || 0) || '',
+          })),
           creators: resolvedCreators,
         });
       } catch {
-        setSearchResults({ plans: [], bundles: [], series: [], creators: [] });
+        setSearchResults({ lessons: [], bundles: [], creators: [] });
       }
     }, 400);
     return () => clearTimeout(timer);
   }, [query, isSearching, plans]);
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto hide-scrollbar pb-[103px] md:pb-0">
+    <div className="flex flex-col h-full relative">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto hide-scrollbar pb-[103px] md:pb-0">
 
         {/* Mobile search */}
         <div className="md:hidden bg-bg-secondary px-6 pt-14 pb-6">
@@ -134,19 +226,20 @@ export default function Discover() {
             <div className="container-content">
               {!searchResults ? (
                 <p className="type-body-default text-text-tertiary text-center py-12">Searching...</p>
-              ) : (searchResults.plans.length + searchResults.bundles.length + searchResults.series.length + searchResults.creators.length) === 0 ? (
+              ) : (searchResults.lessons.length + searchResults.bundles.length + searchResults.creators.length) === 0 ? (
                 <p className="type-body-default text-text-tertiary text-center py-12">No results for "{query}"</p>
               ) : (
                 <div className="flex flex-col gap-8 py-6">
-                  {/* Lesson Plans */}
-                  {searchResults.plans.length > 0 && (
+                  {/* Lessons */}
+                  {searchResults.lessons.length > 0 && (
                     <div>
-                      <h3 className="type-headline-medium text-text-primary mb-4">Lesson Plans</h3>
+                      <h3 className="type-headline-medium text-text-primary mb-4">Lessons</h3>
                       <div className="flex flex-col gap-3">
-                        {searchResults.plans.map(plan => (
+                        {searchResults.lessons.map(plan => (
                           <button
                             key={plan.id}
                             onClick={() => navigate(lessonUrl(plan.id, plan.title))}
+                            title={plan.title}
                             className="flex items-center gap-4 p-4 rounded-[12px] bg-bg-secondary hover:bg-gray-4/20 transition-colors text-left"
                           >
                             <div className="w-14 h-14 rounded-[8px] overflow-hidden bg-bg-base shrink-0">
@@ -167,43 +260,21 @@ export default function Discover() {
                     <div>
                       <h3 className="type-headline-medium text-text-primary mb-4">Bundles</h3>
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                        {searchResults.bundles.map(b => (
+                        {searchResults.bundles.map(({ bundle: b, thumbnail }) => (
                           <button
                             key={b.id}
                             onClick={() => navigate(bundleUrl(b.id, b.title))}
-                            className="flex items-center gap-3 p-3 rounded-[12px] bg-bg-secondary hover:bg-gray-4/20 transition-colors text-left"
+                            title={b.title}
+                            className="card-interactive rounded-[12px] overflow-hidden bg-bg-secondary hover:bg-gray-4/20 transition-colors text-left"
                           >
-                            <div className="w-12 h-12 rounded-[8px] overflow-hidden bg-bg-base shrink-0">
-                              {b.series?.[0] && (
-                                <div className="w-full h-full bg-action-primary/10 flex items-center justify-center">
-                                  <span className="type-pre-text text-action-primary font-bold">{(b.series || []).length}ch</span>
-                                </div>
-                              )}
+                            <div className="w-full aspect-[3/4] bg-bg-base">
+                              {thumbnail && <img src={thumbnail} alt={b.title} className="w-full h-full object-cover" />}
                             </div>
-                            <div className="flex-1 min-w-0">
+                            <div className="p-3">
                               <p className="type-description font-semibold text-text-primary truncate">{b.title}</p>
-                              <p className="type-pre-text text-text-tertiary">{b.durationMinutes} mins</p>
+                              <p className="type-pre-text text-text-tertiary mt-0.5">{(b.series || []).length} chapters · {b.durationMinutes} mins</p>
                             </div>
                           </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Series (Chapters) */}
-                  {searchResults.series.length > 0 && (
-                    <div>
-                      <h3 className="type-headline-medium text-text-primary mb-4">Chapters</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 card-grid-gap">
-                        {searchResults.series.filter(s => s.bundle).map(s => (
-                          <BundleThumbnail
-                            key={s.id}
-                            thumbnail={s.image}
-                            alt={s.title}
-                            size="big"
-                            onClick={() => navigate(bundleUrl(s.bundle!.id))}
-                            className="w-full h-auto aspect-[3/4]"
-                          />
                         ))}
                       </div>
                     </div>
@@ -262,23 +333,24 @@ export default function Discover() {
               </div>
             )}
 
-            {/* Bundle sections — bundle title + ALL chapter (series) thumbnails in a row */}
-            {discoverBundles.map(db => (
-              <div key={db.bundleId} className="bg-bg-base section-tight">
+            {/* Bundle sections — loaded incrementally from API */}
+            {bundleRows.map(row => (
+              <div key={row.bundle.id} className="bg-bg-base section-tight">
                 <div className="container-content">
                   <SectionHeader
-                    title={db.bundleTitle}
-                    onSeeAll={() => handleBundleClick(db)}
-                    scrollRef={{ current: bundleScrollRefs.current[db.bundleId] }}
+                    title={row.bundle.title}
+                    onSeeAll={() => handleBundleClick(row)}
+                    scrollRef={{ current: bundleScrollRefs.current[row.bundle.id] }}
                   />
                   <div
-                    ref={el => { bundleScrollRefs.current[db.bundleId] = el; }}
+                    ref={el => { bundleScrollRefs.current[row.bundle.id] = el; }}
                     className="flex gap-2 overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0"
                   >
-                    {db.allSeries.map(s => (
+                    {row.series.map(s => (
                       <button
                         key={s.id}
-                        onClick={() => handleBundleClick(db)}
+                        onClick={() => handleBundleClick(row)}
+                        title={s.title}
                         className="card-interactive relative w-[120px] h-[160px] md:w-[150px] md:h-[200px] rounded-[8px] overflow-hidden shrink-0"
                       >
                         <img src={s.image} alt={s.title} className="absolute inset-0 w-full h-full object-cover" />
@@ -288,11 +360,31 @@ export default function Discover() {
                 </div>
               </div>
             ))}
+
+            {/* Infinite scroll sentinel + loading indicator */}
+            <div ref={scrollSentinelRef} className="py-4">
+              {loadingMore && (
+                <div className="flex justify-center py-4">
+                  <div className="animate-pulse type-body-default text-text-tertiary">Loading more...</div>
+                </div>
+              )}
+            </div>
           </>
         )}
 
         <div className="hidden md:block h-20" />
       </div>
+
+      {/* Back to top — desktop only */}
+      {showBackToTop && (
+        <button
+          onClick={scrollToTop}
+          className="hidden md:flex fixed bottom-8 right-8 z-40 w-10 h-10 rounded-full bg-action-primary text-white items-center justify-center shadow-lg hover:bg-[#333] transition-colors"
+          title="Back to top"
+        >
+          <ArrowUp size={18} />
+        </button>
+      )}
 
       {/* Purchase modal — bottom sheet on mobile, centered modal on desktop */}
       {modalBundle && (

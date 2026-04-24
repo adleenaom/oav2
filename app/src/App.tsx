@@ -20,6 +20,7 @@ import CreatorProfile from './pages/CreatorProfile';
 import Notifications from './pages/Notifications';
 import Magazine from './pages/Magazine';
 import Liked from './pages/Liked';
+import CreditHistory from './pages/CreditHistory';
 import Subscription from './pages/Subscription';
 import RedeemCode from './pages/RedeemCode';
 import Referral from './pages/Referral';
@@ -62,6 +63,7 @@ function AppLayout() {
           {/* Profile & account */}
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile/edit" element={<EditProfile />} />
+          <Route path="/credit-history" element={<CreditHistory />} />
           <Route path="/change-password" element={<ChangePassword />} />
           <Route path="/settings" element={<Settings />} />
 

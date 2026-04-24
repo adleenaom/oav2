@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Heart, Settings, BookOpen, Clock, Play } from 'lucide-react';
+import { Heart, Settings, BookOpen } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useProgress } from '../hooks/useProgress';
 import { useCredits } from '../hooks/useCredits';
@@ -9,9 +9,10 @@ import SectionHeader from '../components/SectionHeader';
 import BundleThumbnail from '../components/BundleThumbnail';
 import OAButton from '../components/OAButton';
 import CoinIcon from '../components/CoinIcon';
+import ChaptersRow from '../components/ChaptersRow';
 import { apiPost } from '../services/api';
 import { getBundles, getPlans, type OABundle, type OAPlan } from '../services/oa-api';
-import { lessonUrl, bundleUrl } from '../utils/slug';
+import { lessonUrl, bundleUrl, playUrl } from '../utils/slug';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -22,7 +23,6 @@ export default function Profile() {
 
   const continueWatching = getContinueWatching();
   const continueRef = useRef<HTMLDivElement>(null);
-  const recentRef = useRef<HTMLDivElement>(null);
 
   // Fetch user's purchased bundles/plans from API + locally purchased bundles
   const [myBundles, setMyBundles] = useState<OABundle[]>([]);
@@ -32,9 +32,8 @@ export default function Profile() {
   useEffect(() => {
     if (!isLoggedIn) return;
     setProfileLoading(true);
-    apiPost<{ bundles: { id: number }[]; plans: { id: number }[]; continueWatch: any[]; watchAgain: any[] }>('/v3/profile/home', {})
+    apiPost<{ bundles: { id: number }[]; plans: { id: number }[] }>('/v3/profile/home', {})
       .then(async (res) => {
-        // Merge API bundle IDs with locally purchased IDs
         const apiBundleIds = (res.bundles || []).map(b => b.id);
         const allBundleIds = [...new Set([...apiBundleIds, ...purchasedBundleIds])];
         const planIds = (res.plans || []).map(p => p.id);
@@ -46,12 +45,8 @@ export default function Profile() {
         setMyPlans(resolvedPlans);
       })
       .catch(async () => {
-        // API failed but we still have local purchases
         if (purchasedBundleIds.length > 0) {
-          try {
-            const resolved = await getBundles(purchasedBundleIds);
-            setMyBundles(resolved);
-          } catch {}
+          try { setMyBundles(await getBundles(purchasedBundleIds)); } catch {}
         }
       })
       .finally(() => setProfileLoading(false));
@@ -74,14 +69,11 @@ export default function Profile() {
     );
   }
 
-  const recentLikes = [...likes].sort((a, b) => b.likedAt - a.likedAt).slice(0, 10);
-  const hasLearnings = myBundles.length > 0 || myPlans.length > 0;
-
   return (
     <div className="flex flex-col h-full bg-bg-base">
       <div className="flex-1 overflow-y-auto hide-scrollbar pb-[106px] md:pb-0">
 
-        {/* Header */}
+        {/* Header — user info */}
         <div className="bg-bg-secondary">
           <div className="container-content py-8 md:py-10">
             <div className="flex items-center gap-4 md:gap-6">
@@ -97,17 +89,35 @@ export default function Profile() {
               </button>
             </div>
 
-            {/* Credits bar */}
-            <div className="flex items-center gap-3 mt-5 p-4 bg-bg-base rounded-[12px]">
-              <div className="w-8 h-8 rounded-full bg-accent-yellow/20 flex items-center justify-center">
-                <CoinIcon size={16} />
+            {/* Quick actions row */}
+            <div className="flex gap-3 mt-5">
+              {/* Credits + actions */}
+              <div className="flex-1 flex items-center gap-4 p-4 bg-bg-base rounded-[12px]">
+                <div className="flex items-center gap-2">
+                  <CoinIcon size={20} />
+                  <span className="type-headline-medium text-text-primary">{credits}</span>
+                  <span className="type-description text-text-tertiary">credits</span>
+                </div>
+                <div className="flex items-center gap-4 ml-auto">
+                  <button onClick={() => navigate('/credit-history')} className="type-headline-small text-text-primary hover:text-action-secondary transition-colors">
+                    Credit history
+                  </button>
+                  <button onClick={() => navigate('/subscription')} className="type-headline-small text-action-secondary hover:underline">
+                    Top Up
+                  </button>
+                </div>
               </div>
-              <div className="flex-1">
-                <span className="type-headline-medium text-text-primary">{credits}</span>
-                <span className="type-description text-text-tertiary ml-1.5">credits</span>
-              </div>
-              <button onClick={() => navigate('/subscription')} className="type-button text-action-secondary text-[13px]">
-                Top Up
+
+              {/* My likes */}
+              <button
+                onClick={() => navigate('/liked')}
+                className="flex items-center gap-3 px-5 bg-bg-base rounded-[12px] hover:bg-gray-4/20 transition-colors shrink-0"
+              >
+                <Heart size={18} className="text-text-secondary" />
+                <span className="type-headline-small text-text-primary">My likes</span>
+                {likes.length > 0 && (
+                  <span className="type-description text-text-tertiary">({likes.length})</span>
+                )}
               </button>
             </div>
           </div>
@@ -127,10 +137,10 @@ export default function Profile() {
                     <BundleThumbnail
                       key={`${item.type}-${item.id}`}
                       thumbnail={item.thumbnail}
-                      alt={item.chapterTitle}
+                      alt={`${item.title} — ${item.chapterTitle}`}
                       size="big"
                       progress={item.percentage}
-                      onClick={() => navigate(item.type === 'lesson' ? lessonUrl(Number(item.id)) : bundleUrl(Number(item.id)))}
+                      onClick={() => navigate(playUrl(Number(item.id), 0, item.title))}
                       menuActions={actions}
                     />
                   );
@@ -139,83 +149,81 @@ export default function Profile() {
             </div>
           )}
 
-          {/* My Learning */}
+          {/* My Learning — Bundles */}
           <div className="section-tight">
-            <h2 className="type-headline-large text-text-primary mb-4">My Learning</h2>
+            <h2 className="type-headline-large text-text-primary mb-4">Bundles</h2>
             {profileLoading ? (
               <p className="type-body-default text-text-tertiary py-4">Loading...</p>
-            ) : hasLearnings ? (
-              <div className="flex flex-col gap-2">
-                {/* Plans (lesson plans) */}
+            ) : myBundles.length > 0 ? (
+              <div className="flex scroll-gap overflow-x-auto hide-scrollbar -mx-6 px-6 md:mx-0 md:px-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-4 md:overflow-visible">
+                {myBundles.map(bundle => (
+                  <div
+                    key={bundle.id}
+                    className="shrink-0 w-[300px] md:w-auto bg-bg-secondary rounded-[16px] overflow-hidden flex flex-col"
+                  >
+                    <div className="p-5 flex flex-col gap-2">
+                      <h3 className="type-headline-small text-text-primary truncate">{bundle.title}</h3>
+                      {/* Chapter thumbnails row */}
+                      <ChaptersRow bundleId={bundle.id} size="small" />
+                    </div>
+                    <div className="px-5 pb-5">
+                      <button
+                        onClick={() => navigate(bundleUrl(bundle.id, bundle.title))}
+                        className="w-full py-2.5 bg-action-primary text-white type-button rounded-[8px] hover:bg-[#333] transition-colors"
+                      >
+                        View
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-bg-secondary rounded-[12px] p-6 flex flex-col items-center gap-3">
+                <BookOpen size={32} className="text-text-tertiary" />
+                <p className="type-body-default text-text-tertiary">No bundles yet</p>
+                <OAButton variant="blue" size="medium" onClick={() => navigate('/discover')}>Explore</OAButton>
+              </div>
+            )}
+          </div>
+
+          {/* My Learning — Lessons */}
+          <div className="section-tight">
+            <h2 className="type-headline-large text-text-primary mb-4">Lessons</h2>
+            {profileLoading ? (
+              <p className="type-body-default text-text-tertiary py-4">Loading...</p>
+            ) : myPlans.length > 0 ? (
+              <div className="flex flex-col gap-4">
                 {myPlans.map(plan => (
                   <button
-                    key={`plan-${plan.id}`}
+                    key={plan.id}
                     onClick={() => navigate(lessonUrl(plan.id, plan.title))}
-                    className="flex items-center gap-4 p-4 rounded-[12px] bg-bg-secondary hover:bg-gray-4/20 transition-colors text-left"
+                    className="flex gap-4 p-4 rounded-[16px] bg-bg-secondary hover:bg-gray-4/20 transition-colors text-left w-full"
                   >
-                    <div className="w-14 h-14 rounded-[8px] overflow-hidden bg-bg-base shrink-0">
-                      <img src={plan.image} alt={plan.title} className="w-full h-full object-cover" />
+                    {/* Lesson thumbnail */}
+                    <div className="w-[120px] h-[160px] md:w-[140px] md:h-[187px] rounded-[10px] overflow-hidden bg-bg-base shrink-0 relative">
+                      <img src={plan.image} alt="" className="w-full h-full object-cover" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="type-headline-small text-text-primary truncate">{plan.title}</p>
-                      <p className="type-pre-text text-text-tertiary mt-0.5">{plan.bundles.length} bundles</p>
-                    </div>
-                    <ChevronRight size={16} className="text-text-tertiary shrink-0" />
-                  </button>
-                ))}
-                {/* Bundles */}
-                {myBundles.map(bundle => (
-                  <button
-                    key={`bundle-${bundle.id}`}
-                    onClick={() => navigate(bundleUrl(bundle.id, bundle.title))}
-                    className="flex items-center gap-4 p-4 rounded-[12px] bg-bg-secondary hover:bg-gray-4/20 transition-colors text-left"
-                  >
-                    <div className="w-14 h-14 rounded-[8px] bg-action-secondary/10 flex items-center justify-center shrink-0">
-                      <Play size={18} className="text-action-secondary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="type-headline-small text-text-primary truncate">{bundle.title}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <Clock size={12} className="text-text-tertiary" />
-                        <span className="type-pre-text text-text-tertiary">{bundle.durationMinutes} mins</span>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0 flex flex-col gap-2 py-1">
+                      <p className="type-headline-medium text-text-primary">{plan.title}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="type-pre-text text-text-tertiary">{plan.bundles.length} bundles</span>
                         <span className="type-pre-text text-text-tertiary">·</span>
-                        <span className="type-pre-text text-text-tertiary">{(bundle.series || []).length} chapters</span>
+                        <span className="type-pre-text text-text-tertiary">{plan.duration}</span>
+                      </div>
+                      <div className="flex-1" />
+                      <div className="flex items-center gap-2 bg-action-primary text-white type-button rounded-[8px] px-4 py-2.5 justify-center w-fit">
+                        Resume Learning
                       </div>
                     </div>
-                    <ChevronRight size={16} className="text-text-tertiary shrink-0" />
                   </button>
                 ))}
               </div>
             ) : (
               <div className="bg-bg-secondary rounded-[12px] p-6 flex flex-col items-center gap-3">
                 <BookOpen size={32} className="text-text-tertiary" />
-                <p className="type-body-default text-text-tertiary">No courses yet</p>
-                <p className="type-description text-text-tertiary text-center">Browse the Discover page to find courses and start learning.</p>
-                <OAButton variant="blue" size="medium" onClick={() => navigate('/discover')}>Explore Courses</OAButton>
-              </div>
-            )}
-          </div>
-
-          {/* My Likes — recent preview */}
-          <div className="section-tight">
-            <SectionHeader title="My Likes" onSeeAll={() => navigate('/liked')} scrollRef={recentRef} />
-            {recentLikes.length > 0 ? (
-              <div ref={recentRef} className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
-                {recentLikes.map(video => (
-                  <button
-                    key={video.id}
-                    onClick={() => navigate(`/foryou/0`)}
-                    className="card-interactive relative w-[100px] h-[178px] md:w-[120px] md:h-[213px] rounded-[8px] overflow-hidden shrink-0"
-                  >
-                    <img src={video.thumbnail} alt={video.title} className="absolute inset-0 w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-bg-secondary rounded-[12px] p-6 flex flex-col items-center gap-3 mt-4">
-                <Heart size={32} className="text-text-tertiary" />
-                <p className="type-body-default text-text-tertiary">No liked videos yet</p>
-                <p className="type-description text-text-tertiary text-center">Tap the heart on For You videos to save them here.</p>
+                <p className="type-body-default text-text-tertiary">No lessons yet</p>
+                <OAButton variant="blue" size="medium" onClick={() => navigate('/discover')}>Explore</OAButton>
               </div>
             )}
           </div>

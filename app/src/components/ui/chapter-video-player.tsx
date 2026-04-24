@@ -134,8 +134,14 @@ function ChapterVideoPlayer({
 
     if (isHls && Hls.isSupported()) {
       const authHeaders = getAuthHeaders()
+      let retried = false
       const hls = new Hls({
-        xhrSetup: (xhr: XMLHttpRequest) => {
+        xhrSetup: (xhr: XMLHttpRequest, url: string) => {
+          // For cross-origin requests, use Authorization header (CORS allows it)
+          if (url.startsWith('https://')) {
+            xhr.setRequestHeader('Authorization', `Bearer ${authHeaders['Z-TOKEN'] || ''}`)
+          }
+          // For same-origin (proxied), use Z-headers
           Object.entries(authHeaders).forEach(([key, value]) => {
             xhr.setRequestHeader(key, value)
           })
@@ -147,11 +153,19 @@ function ChapterVideoPlayer({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         video.play().catch(() => setIsPlaying(false))
       })
-      hls.on(Hls.Events.ERROR, (_event: string, data: { fatal?: boolean }) => {
+      hls.on(Hls.Events.ERROR, (_event: string, data: { fatal?: boolean; type?: string }) => {
         if (data.fatal) {
-          console.warn('HLS fatal error — video may require session auth')
-          setIsPlaying(false)
-          setVideoError(true)
+          // Retry once with proxied URL if direct URL fails
+          if (!retried && videoUrl.startsWith('https://app.theopenacademy.org')) {
+            retried = true
+            const proxiedUrl = videoUrl.replace('https://app.theopenacademy.org', '')
+            console.warn('HLS: retrying with proxied URL')
+            hls.loadSource(proxiedUrl)
+          } else {
+            console.warn('HLS fatal error — video unavailable')
+            setIsPlaying(false)
+            setVideoError(true)
+          }
         }
       })
     } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -159,6 +173,12 @@ function ChapterVideoPlayer({
       video.src = videoUrl
       video.addEventListener('loadedmetadata', () => {
         video.play().catch(() => setIsPlaying(false))
+      }, { once: true })
+      video.addEventListener('error', () => {
+        // Retry with proxied URL
+        if (videoUrl.startsWith('https://app.theopenacademy.org')) {
+          video.src = videoUrl.replace('https://app.theopenacademy.org', '')
+        }
       }, { once: true })
     } else {
       // Regular MP4
