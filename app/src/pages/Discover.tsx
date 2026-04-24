@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Search as SearchIcon, ArrowUp } from 'lucide-react';
 import SectionHeader from '../components/SectionHeader';
 import LessonCard from '../components/LessonCard';
@@ -21,6 +21,7 @@ const BATCH_SIZE = 3;
 
 export default function Discover() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [query, setQuery] = useState('');
   const { plans } = useHomepage();
   const { isBundleAccessible } = useCredits();
@@ -42,7 +43,8 @@ export default function Discover() {
   useEffect(() => {
     apiPost<{ items: { id: number }[] }>('/v3/bundles/search', { query: '', size: 100, index: 0 })
       .then(res => {
-        const ids = (res.items || []).map(i => i.id);
+        // Sort by highest ID first (most recently uploaded)
+        const ids = (res.items || []).map(i => i.id).sort((a, b) => b - a);
         setAllBundleIds(ids);
         setHasMore(ids.length > 0);
       })
@@ -67,7 +69,12 @@ export default function Discover() {
       const allSeriesIds = [...new Set(bundles.flatMap(b => (b.series || []).map(s => s.id)))];
       const allSeries = allSeriesIds.length > 0 ? await getSeries(allSeriesIds) : [];
 
-      const newRows: DiscoverBundleRow[] = bundles.map(b => {
+      // Reorder bundles to match the sorted batchIds order (API retrieve doesn't preserve order)
+      const orderedBundles = batchIds
+        .map(id => bundles.find(b => b.id === id))
+        .filter(Boolean) as OABundle[];
+
+      const newRows: DiscoverBundleRow[] = orderedBundles.map(b => {
         const bSeriesIds = (b.series || []).map(s => s.id);
         const bSeries = bSeriesIds
           .map(id => allSeries.find(s => s.id === id))
@@ -99,6 +106,18 @@ export default function Discover() {
   const scrollToTop = () => {
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Scroll to #bundles section once when navigated with hash
+  const hasScrolledToHash = useRef(false);
+  useEffect(() => {
+    if (location.hash === '#bundles' && bundleRows.length > 0 && !hasScrolledToHash.current) {
+      hasScrolledToHash.current = true;
+      const el = document.getElementById('bundles');
+      if (el) {
+        setTimeout(() => el.scrollIntoView({ behavior: 'smooth' }), 200);
+      }
+    }
+  }, [location.hash, bundleRows.length]);
 
   // Infinite scroll — load more when sentinel is visible
   useEffect(() => {
@@ -267,7 +286,7 @@ export default function Discover() {
                             title={b.title}
                             className="card-interactive rounded-[12px] overflow-hidden bg-bg-secondary hover:bg-gray-4/20 transition-colors text-left"
                           >
-                            <div className="w-full aspect-[3/4] bg-bg-base">
+                            <div className="w-full aspect-[2/3] bg-bg-base">
                               {thumbnail && <img src={thumbnail} alt={b.title} className="w-full h-full object-cover" />}
                             </div>
                             <div className="p-3">
@@ -312,7 +331,7 @@ export default function Discover() {
               <div className="bg-bg-base section-tight">
                 <div className="container-content">
                   <SectionHeader title="Lessons" onSeeAll={() => navigate('/viewall/lessons')} scrollRef={lessonsScrollRef} />
-                  <div ref={lessonsScrollRef} className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
+                  <div ref={lessonsScrollRef} className="flex scroll-gap overflow-x-auto hide-scrollbar scroll-row mt-4 -mx-6 px-6 md:mx-0 md:px-0">
                     {plans.map(plan => (
                       <LessonCard
                         key={plan.id}
@@ -334,6 +353,7 @@ export default function Discover() {
             )}
 
             {/* Bundle sections — loaded incrementally from API */}
+            <div id="bundles" />
             {bundleRows.map(row => (
               <div key={row.bundle.id} className="bg-bg-base section-tight">
                 <div className="container-content">
@@ -344,14 +364,14 @@ export default function Discover() {
                   />
                   <div
                     ref={el => { bundleScrollRefs.current[row.bundle.id] = el; }}
-                    className="flex gap-2 overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0"
+                    className="flex gap-2 overflow-x-auto hide-scrollbar scroll-row mt-4 -mx-6 px-6 md:mx-0 md:px-0"
                   >
                     {row.series.map(s => (
                       <button
                         key={s.id}
                         onClick={() => handleBundleClick(row)}
                         title={s.title}
-                        className="card-interactive relative w-[120px] h-[160px] md:w-[150px] md:h-[200px] rounded-[8px] overflow-hidden shrink-0"
+                        className="card-interactive relative w-[120px] h-[180px] md:w-[150px] md:h-[225px] rounded-[8px] overflow-hidden shrink-0"
                       >
                         <img src={s.image} alt={s.title} className="absolute inset-0 w-full h-full object-cover" />
                       </button>

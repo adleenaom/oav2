@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getHomepageData, resolveDiscoverBundles, type OADailyVideo, type OAPlan, type OASeries } from '../services/oa-api';
+import { getHomepageData, resolveDiscoverBundles, type OADailyVideo, type OAPlan, type OASeries, type OACreator } from '../services/oa-api';
 
 export interface DiscoverBundle {
   bundleId: number;
@@ -9,6 +9,7 @@ export interface DiscoverBundle {
   durationMinutes: number;
   chapterCount: number;
   allSeries: OASeries[];
+  creator: OACreator | null;
 }
 
 interface HomepageData {
@@ -48,8 +49,8 @@ export function useHomepage(): HomepageData {
           error: null,
         }));
 
-        // Phase 2: Load discover bundles in background (slower — resolves all series + chapters)
-        resolveDiscoverBundles(result.series)
+        // Phase 2: Load discover bundles in background from full catalog
+        resolveDiscoverBundles()
           .then(discoverBundles => {
             if (!cancelled) {
               setData(prev => ({ ...prev, discoverBundles }));

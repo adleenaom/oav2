@@ -399,6 +399,13 @@
   box-shadow: none;
 }
 
+/* Horizontal scroll row — allows card hover effects (lift/shadow) without clipping */
+.scroll-row {
+  overflow-y: visible;
+  padding-top: 4px;
+  padding-bottom: 8px;
+}
+
 /* Interactive card pattern — consistent hover/active for all clickable cards */
 .card-interactive {
   cursor: pointer;

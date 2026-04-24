@@ -32,6 +32,22 @@ export default defineConfig({
         changeOrigin: true,
         secure: true,
       },
+      // Resolve /media/playlist/ redirect → return CDN URL as plain text
+      '/resolve-media': {
+        target: 'https://app.theopenacademy.org',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path: string) => path.replace('/resolve-media', '/media'),
+        configure: (proxy: any) => {
+          proxy.on('proxyRes', (proxyRes: any, _req: any, res: any) => {
+            if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
+              res.writeHead(200, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
+              res.end(proxyRes.headers.location);
+              proxyRes.destroy();
+            }
+          });
+        },
+      },
     },
   },
 })

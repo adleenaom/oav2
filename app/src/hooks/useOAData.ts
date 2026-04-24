@@ -65,7 +65,15 @@ export function useCreator(id: number | null) {
   return { data, isLoading };
 }
 
-/** A fully resolved chapter with video URL and assessments */
+/** A single video part within a chapter */
+export interface ChapterPart {
+  contentId: number;
+  videoUrl: string;
+  videoImage: string;
+  durationMinutes: number;
+}
+
+/** A fully resolved chapter with video parts and assessments */
 export interface ResolvedChapter {
   id: number;
   seriesId: number;
@@ -76,9 +84,12 @@ export interface ResolvedChapter {
   duration: string;
   seqNo: number;
   isPremium: boolean;
+  /** First part's video URL (backwards compat) */
   videoUrl: string;
   videoImage: string;
   durationMinutes: number;
+  /** All video parts in this chapter */
+  parts: ChapterPart[];
   hasAssessment: boolean;
   assessments: OAAssessmentContent[];
 }
@@ -118,12 +129,18 @@ export function useBundleDetail(bundleId: number | null) {
         const allContentIds = chapters.flatMap(ch => (ch.contents || []).map(c => c.id));
         const contents = allContentIds.length > 0 ? await getContents(allContentIds) : [];
 
-        // Build content map: chapterId -> first video content
-        const contentByChapter = new Map<number, OAContent>();
+        // Build content map: chapterId -> all video contents (sorted by seqNo)
+        const contentsByChapter = new Map<number, OAContent[]>();
         for (const c of contents) {
-          if (c.type === 'video' && !contentByChapter.has(c.chapterId)) {
-            contentByChapter.set(c.chapterId, c);
+          if (c.type === 'video') {
+            const existing = contentsByChapter.get(c.chapterId) || [];
+            existing.push(c);
+            contentsByChapter.set(c.chapterId, existing);
           }
+        }
+        // Sort each chapter's contents by seqNo
+        for (const [, arr] of contentsByChapter) {
+          arr.sort((a, b) => a.seqNo - b.seqNo);
         }
 
         // Resolve assessment content for chapters that have them
@@ -153,8 +170,15 @@ export function useBundleDetail(bundleId: number | null) {
             .sort((a, b) => a.seqNo - b.seqNo);
 
           for (const ch of sChapters) {
-            const content = contentByChapter.get(ch.id);
+            const chContents = contentsByChapter.get(ch.id) || [];
+            const firstContent = chContents[0];
             const chAssessments = assessmentsByChapter.get(ch.id) || [];
+            const parts: ChapterPart[] = chContents.map(c => ({
+              contentId: c.id,
+              videoUrl: c.video?.source || '',
+              videoImage: c.video?.image || c.image || s.image,
+              durationMinutes: c.video?.durationMinutes || 0,
+            }));
             rChapters.push({
               id: ch.id,
               seriesId: s.id,
@@ -165,9 +189,10 @@ export function useBundleDetail(bundleId: number | null) {
               duration: ch.duration,
               seqNo: ch.seqNo,
               isPremium: ch.isPremium,
-              videoUrl: content?.video?.source || '',
-              videoImage: content?.video?.image || content?.image || s.image,
-              durationMinutes: content?.video?.durationMinutes || 0,
+              videoUrl: firstContent?.video?.source || '',
+              videoImage: firstContent?.video?.image || firstContent?.image || s.image,
+              durationMinutes: firstContent?.video?.durationMinutes || 0,
+              parts,
               hasAssessment: chAssessments.length > 0,
               assessments: chAssessments.sort((a, b) => a.seqNo - b.seqNo),
             });

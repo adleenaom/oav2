@@ -12,7 +12,7 @@ export function SkeletonCardRow() {
     <div className="flex scroll-gap overflow-hidden mt-4">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="shrink-0 flex flex-col gap-2">
-          <Shimmer className="w-[160px] h-[213px] md:w-[140px] md:h-[200px] rounded-[8px]" />
+          <Shimmer className="w-[160px] h-[240px] md:w-[140px] md:h-[210px] rounded-[8px]" />
         </div>
       ))}
     </div>
@@ -43,7 +43,7 @@ export function SkeletonGrid() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 card-grid-gap mt-4">
       {Array.from({ length: 8 }).map((_, i) => (
-        <Shimmer key={i} className="w-full aspect-[3/4]" />
+        <Shimmer key={i} className="w-full aspect-[2/3]" />
       ))}
     </div>
   );
@@ -97,7 +97,7 @@ export function BundleDetailSkeleton() {
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="flex items-start gap-5 py-5 border-b border-border-default">
                 <Shimmer className="w-6 h-6 rounded-full" />
-                <Shimmer className="w-[80px] h-[107px]" />
+                <Shimmer className="w-[80px] h-[120px]" />
                 <div className="flex-1 flex flex-col gap-2">
                   <Shimmer className="h-5 w-3/4" />
                   <Shimmer className="h-3 w-24" />

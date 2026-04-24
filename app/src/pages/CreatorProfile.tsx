@@ -79,7 +79,7 @@ export default function CreatorProfile() {
                     size="big"
                     price={bundle.is_free ? 'free' : bundle.credits_required}
                     onClick={() => navigate(bundleUrl(bundle.id))}
-                    className="w-full h-auto aspect-[3/4]"
+                    className="w-full h-auto aspect-[2/3]"
                   />
                 ))}
               </div>
@@ -98,7 +98,7 @@ export default function CreatorProfile() {
                     alt={video.title}
                     size="big"
                     onClick={() => {}}
-                    className="w-full h-auto aspect-[3/4]"
+                    className="w-full h-auto aspect-[2/3]"
                   />
                 ))}
               </div>

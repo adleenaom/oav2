@@ -41,12 +41,16 @@ export default function Profile() {
           allBundleIds.length > 0 ? getBundles(allBundleIds) : Promise.resolve([]),
           planIds.length > 0 ? getPlans(planIds) : Promise.resolve([]),
         ]);
-        setMyBundles(resolvedBundles);
-        setMyPlans(resolvedPlans);
+        // Sort by most recent (highest ID first)
+        setMyBundles(resolvedBundles.sort((a, b) => b.id - a.id));
+        setMyPlans(resolvedPlans.sort((a, b) => b.id - a.id));
       })
       .catch(async () => {
         if (purchasedBundleIds.length > 0) {
-          try { setMyBundles(await getBundles(purchasedBundleIds)); } catch {}
+          try {
+            const bundles = await getBundles(purchasedBundleIds);
+            setMyBundles(bundles.sort((a, b) => b.id - a.id));
+          } catch {}
         }
       })
       .finally(() => setProfileLoading(false));
@@ -129,10 +133,13 @@ export default function Profile() {
           {continueWatching.length > 0 && (
             <div className="section-tight">
               <SectionHeader title="Continue Watching" onSeeAll={() => navigate('/viewall/continue')} scrollRef={continueRef} />
-              <div ref={continueRef} className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
+              <div ref={continueRef} className="flex scroll-gap overflow-x-auto hide-scrollbar scroll-row mt-4 -mx-6 px-6 md:mx-0 md:px-0">
                 {continueWatching.map(item => {
-                  const actions = [{ label: 'Remove', onClick: () => removeFromContinueWatching(item.id) }];
-                  if (item.planId) actions.push({ label: 'Go to lessons', onClick: () => navigate(lessonUrl(Number(item.planId))) });
+                  const actions = [
+                    { label: 'Remove', onClick: () => removeFromContinueWatching(item.id) },
+                    { label: 'Go to bundle', onClick: () => navigate(bundleUrl(Number(item.id), item.title)) },
+                  ];
+                  if (item.planId) actions.push({ label: 'Go to lesson', onClick: () => navigate(lessonUrl(Number(item.planId))) });
                   return (
                     <BundleThumbnail
                       key={`${item.type}-${item.id}`}
@@ -155,7 +162,7 @@ export default function Profile() {
             {profileLoading ? (
               <p className="type-body-default text-text-tertiary py-4">Loading...</p>
             ) : myBundles.length > 0 ? (
-              <div className="flex scroll-gap overflow-x-auto hide-scrollbar -mx-6 px-6 md:mx-0 md:px-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-4 md:overflow-visible">
+              <div className="flex scroll-gap overflow-x-auto hide-scrollbar scroll-row -mx-6 px-6 md:mx-0 md:px-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-4 md:overflow-visible">
                 {myBundles.map(bundle => (
                   <div
                     key={bundle.id}
@@ -200,7 +207,7 @@ export default function Profile() {
                     className="flex gap-4 p-4 rounded-[16px] bg-bg-secondary hover:bg-gray-4/20 transition-colors text-left w-full"
                   >
                     {/* Lesson thumbnail */}
-                    <div className="w-[120px] h-[160px] md:w-[140px] md:h-[187px] rounded-[10px] overflow-hidden bg-bg-base shrink-0 relative">
+                    <div className="w-[120px] h-[180px] md:w-[140px] md:h-[210px] rounded-[10px] overflow-hidden bg-bg-base shrink-0 relative">
                       <img src={plan.image} alt="" className="w-full h-full object-cover" />
                     </div>
                     {/* Info */}

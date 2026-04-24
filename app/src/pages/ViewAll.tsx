@@ -94,9 +94,10 @@ export default function ViewAll() {
               {continueWatching.map(item => {
                 const actions = [
                   { label: 'Remove', onClick: () => removeFromContinueWatching(item.id) },
+                  { label: 'Go to bundle', onClick: () => navigate(bundleUrl(Number(item.id), item.title)) },
                 ];
                 if (item.planId) {
-                  actions.push({ label: 'Go to lessons', onClick: () => navigate(lessonUrl(Number(item.planId))) });
+                  actions.push({ label: 'Go to lesson', onClick: () => navigate(lessonUrl(Number(item.planId))) });
                 }
                 return (
                   <BundleThumbnail
@@ -106,7 +107,7 @@ export default function ViewAll() {
                     size="big"
                     progress={item.percentage}
                     onClick={() => navigate(item.type === 'lesson' ? lessonUrl(Number(item.id)) : bundleUrl(Number(item.id)))}
-                    className="w-full h-auto aspect-[3/4]"
+                    className="w-full h-auto aspect-[2/3]"
                     menuActions={actions}
                   />
                 );
@@ -127,7 +128,7 @@ export default function ViewAll() {
                     thumbnail: video.video.image, videoUrl: video.video.source,
                   }}
                   onClick={() => navigate(`/foryou/${index}`)}
-                  className="w-full h-auto aspect-[3/4]"
+                  className="w-full h-auto aspect-[2/3]"
                 />
               ))}
             </div>
@@ -179,7 +180,7 @@ export default function ViewAll() {
                 <button
                   key={`${item.type}-${item.id}`}
                   onClick={() => navigate(item.type === 'lesson' ? lessonUrl(Number(item.id)) : bundleUrl(Number(item.id)))}
-                  className="card-interactive relative aspect-[3/4] rounded-[8px] overflow-hidden"
+                  className="card-interactive relative aspect-[2/3] rounded-[8px] overflow-hidden"
                 >
                   <img src={item.thumbnail} alt={item.chapterTitle} className="absolute inset-0 w-full h-full object-cover" />
                   {item.percentage > 0 && item.percentage < 100 && (
@@ -213,7 +214,7 @@ export default function ViewAll() {
                         thumbnail: video.video.image, videoUrl: video.video.source,
                       }}
                       onClick={() => navigate(`/foryou/${index}`)}
-                      className="w-full h-auto aspect-[3/4]"
+                      className="w-full h-auto aspect-[2/3]"
                     />
                   ))}
                 </div>

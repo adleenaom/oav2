@@ -8,10 +8,10 @@ import CoinIcon from './CoinIcon';
  * Pure thumbnail card with price/progress overlay.
  * Matches Figma "Bundle Progress" component exactly.
  *
- * Sizes (3:4 aspect ratio):
- *   default  — 100 × 133px
- *   medium   — 120 × 160px
- *   big      — 160 × 213px
+ * Sizes (2:3 aspect ratio):
+ *   default  — 100 × 150px
+ *   medium   — 120 × 180px
+ *   big      — 160 × 240px
  */
 
 type ThumbnailSize = 'default' | 'medium' | 'big';
@@ -34,9 +34,9 @@ interface BundleThumbnailProps {
 }
 
 const sizeMap: Record<ThumbnailSize, { w: string; h: string }> = {
-  default: { w: 'w-[100px]', h: 'h-[133px]' },
-  medium:  { w: 'w-[120px]', h: 'h-[160px]' },
-  big:     { w: 'w-[160px]', h: 'h-[213px]' },
+  default: { w: 'w-[100px]', h: 'h-[150px]' },
+  medium:  { w: 'w-[120px]', h: 'h-[180px]' },
+  big:     { w: 'w-[160px]', h: 'h-[240px]' },
 };
 
 function getBarWidth(progress: number): string {

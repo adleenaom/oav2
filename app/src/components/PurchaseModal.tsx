@@ -40,8 +40,13 @@ export default function PurchaseModal({ bundle, isOpen, onClose }: PurchaseModal
   };
 
   const handleClose = () => {
+    const wasSuccess = state === 'success';
     setState('overview');
     onClose();
+    // Reload to reflect updated access state after purchase
+    if (wasSuccess) {
+      window.location.reload();
+    }
   };
 
   return (

@@ -31,6 +31,7 @@ interface ChapterVideoPlayerProps {
   onPrev?: () => void
   onClose: () => void
   onEnded: () => void
+  onTitleClick?: () => void
   className?: string
 }
 
@@ -50,6 +51,7 @@ function ChapterVideoPlayer({
   onPrev,
   onClose,
   onEnded,
+  onTitleClick,
   className,
 }: ChapterVideoPlayerProps) {
   const videoRef = React.useRef<HTMLVideoElement>(null)
@@ -118,11 +120,44 @@ function ChapterVideoPlayer({
   }, [isDragging, showCCMenu])
 
   // HLS + play on mount
+  //
+  // The backend /media/playlist/<token> returns a 303 redirect to a signed CloudFront
+  // CDN URL. The m3u8 master playlist contains relative URLs (file_1.m3u8, segments, etc.)
+  // that must resolve against the CDN base URL, not our proxy.
+  //
+  // Strategy: resolve the redirect via a same-origin proxy fetch (redirect: 'manual')
+  // to extract the CDN URL from the Location header, then give HLS.js the CDN URL.
   const hlsRef = React.useRef<Hls | null>(null)
+
+  // Resolve /media/playlist/ URL → signed CloudFront CDN URL via /resolve-media/ endpoint.
+  // The endpoint hits the backend, captures the 303 redirect Location, and returns the CDN URL as text.
+  const resolveCdnUrl = React.useCallback(async (url: string): Promise<string> => {
+    if (!url.includes('/media/playlist/')) return url
+
+    // Strip upstream domain and use /resolve-media/ prefix
+    const mediaPath = url.startsWith('https://app.theopenacademy.org')
+      ? url.replace('https://app.theopenacademy.org/media/', '')
+      : url.replace(/^\/media\//, '')
+
+    try {
+      const res = await fetch(`/resolve-media/${mediaPath}`, {
+        headers: getAuthHeaders(),
+      })
+      if (res.ok) {
+        const cdnUrl = (await res.text()).trim()
+        if (cdnUrl.startsWith('https://')) return cdnUrl
+      }
+    } catch (e) {
+      console.warn('Failed to resolve CDN URL:', e)
+    }
+    // Fallback: return original URL (will likely fail but worth trying)
+    return url
+  }, [])
 
   React.useEffect(() => {
     const video = videoRef.current
     if (!video || !videoUrl) return
+    let cancelled = false
 
     // Cleanup previous HLS instance
     if (hlsRef.current) {
@@ -132,62 +167,52 @@ function ChapterVideoPlayer({
 
     const isHls = videoUrl.includes('.m3u8') || videoUrl.includes('playlist')
 
-    if (isHls && Hls.isSupported()) {
-      const authHeaders = getAuthHeaders()
-      let retried = false
-      const hls = new Hls({
-        xhrSetup: (xhr: XMLHttpRequest, url: string) => {
-          // For cross-origin requests, use Authorization header (CORS allows it)
-          if (url.startsWith('https://')) {
-            xhr.setRequestHeader('Authorization', `Bearer ${authHeaders['Z-TOKEN'] || ''}`)
-          }
-          // For same-origin (proxied), use Z-headers
-          Object.entries(authHeaders).forEach(([key, value]) => {
-            xhr.setRequestHeader(key, value)
-          })
-        },
-      })
-      hlsRef.current = hls
-      hls.loadSource(videoUrl)
-      hls.attachMedia(video)
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(() => setIsPlaying(false))
-      })
-      hls.on(Hls.Events.ERROR, (_event: string, data: { fatal?: boolean; type?: string }) => {
-        if (data.fatal) {
-          // Retry once with proxied URL if direct URL fails
-          if (!retried && videoUrl.startsWith('https://app.theopenacademy.org')) {
-            retried = true
-            const proxiedUrl = videoUrl.replace('https://app.theopenacademy.org', '')
-            console.warn('HLS: retrying with proxied URL')
-            hls.loadSource(proxiedUrl)
-          } else {
+    const initPlayer = async () => {
+      let finalUrl = videoUrl
+      if (isHls) {
+        finalUrl = await resolveCdnUrl(videoUrl)
+        if (cancelled) return
+      }
+
+      if (isHls && Hls.isSupported()) {
+        const hls = new Hls()
+        hlsRef.current = hls
+        hls.loadSource(finalUrl)
+        hls.attachMedia(video)
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          if (!cancelled) video.play().catch(() => setIsPlaying(false))
+        })
+        hls.on(Hls.Events.ERROR, (_event: string, data: { fatal?: boolean; type?: string }) => {
+          if (data.fatal) {
             console.warn('HLS fatal error — video unavailable')
+            if (!cancelled) {
+              setIsPlaying(false)
+              setVideoError(true)
+            }
+          }
+        })
+      } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Safari native HLS — handles redirects natively
+        video.src = finalUrl
+        video.addEventListener('loadedmetadata', () => {
+          if (!cancelled) video.play().catch(() => setIsPlaying(false))
+        }, { once: true })
+        video.addEventListener('error', () => {
+          if (!cancelled) {
             setIsPlaying(false)
             setVideoError(true)
           }
-        }
-      })
-    } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Safari native HLS
-      video.src = videoUrl
-      video.addEventListener('loadedmetadata', () => {
+        }, { once: true })
+      } else {
+        video.src = finalUrl
         video.play().catch(() => setIsPlaying(false))
-      }, { once: true })
-      video.addEventListener('error', () => {
-        // Retry with proxied URL
-        if (videoUrl.startsWith('https://app.theopenacademy.org')) {
-          video.src = videoUrl.replace('https://app.theopenacademy.org', '')
-        }
-      }, { once: true })
-    } else {
-      // Regular MP4
-      video.src = videoUrl
-      video.play().catch(() => setIsPlaying(false))
+      }
     }
 
+    initPlayer()
     resetControlsTimer()
     return () => {
+      cancelled = true
       clearTimeout(controlsTimer.current)
       if (hlsRef.current) {
         hlsRef.current.destroy()
@@ -284,7 +309,13 @@ function ChapterVideoPlayer({
       )}>
         <div className="flex items-start justify-between">
           <div>
-            <p className="font-serif italic text-[16px] text-white leading-normal">{bundleTitle}</p>
+            {onTitleClick ? (
+              <button onClick={onTitleClick} className="font-serif italic text-[16px] text-white leading-normal hover:underline text-left">
+                {chapterTitle}
+              </button>
+            ) : (
+              <p className="font-serif italic text-[16px] text-white leading-normal">{chapterTitle}</p>
+            )}
             <p className="type-pre-text text-white/70">Part {partNumber} of {totalParts}</p>
           </div>
           {/* Close button — mobile only (desktop has it outside the container) */}
@@ -418,40 +449,8 @@ function ChapterVideoPlayer({
         }
       `}</style>
 
-      {/* Desktop close button */}
-      <button
-        onClick={onClose}
-        className="hidden md:flex absolute top-6 right-6 z-[110] w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 items-center justify-center transition-colors"
-      >
-        <X size={22} className="text-white" />
-      </button>
-
-      {/* Desktop nav arrows — right side */}
-      {(hasNext || hasPrev) && (
-        <div className="hidden md:flex absolute right-6 top-1/2 -translate-y-1/2 z-[110] flex-col items-center gap-3">
-          <button
-            onClick={() => { if (hasPrev && onPrev) { setSlideDir('down'); setTimeout(() => { onPrev(); setSlideDir(null) }, 300) } }}
-            disabled={!hasPrev}
-            className={cn(
-              "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
-              hasPrev ? "bg-white/10 hover:bg-white/20 text-white" : "bg-white/5 text-white/20 pointer-events-none"
-            )}
-          >
-            <ChevronUp size={20} />
-          </button>
-          <span className="type-pre-text text-white/40 tabular-nums">{partNumber}/{totalParts}</span>
-          <button
-            onClick={() => { if (hasNext && onNext) { setSlideDir('up'); setTimeout(() => { onNext(); setSlideDir(null) }, 300) } }}
-            disabled={!hasNext}
-            className={cn(
-              "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
-              hasNext ? "bg-white/10 hover:bg-white/20 text-white" : "bg-white/5 text-white/20 pointer-events-none"
-            )}
-          >
-            <ChevronDown size={20} />
-          </button>
-        </div>
-      )}
+      {/* Desktop layout: video + side controls in a flex row */}
+      <div className="w-full h-full md:flex md:items-center md:justify-center md:gap-4">
 
       {/* Video container — full-screen on mobile, centered 9:16 on desktop */}
       <div
@@ -462,7 +461,6 @@ function ChapterVideoPlayer({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        style={{}}
       >
         {/* Desktop sizing wrapper */}
         <div
@@ -512,6 +510,50 @@ function ChapterVideoPlayer({
           </div>
         </div>
       </div>
+
+      {/* Desktop side controls — close + nav arrows, adjacent to video */}
+      <div className="hidden md:flex flex-col items-center gap-4 shrink-0">
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+        >
+          <X size={22} className="text-white" />
+        </button>
+
+        <div className="flex-1" />
+
+        {/* Nav arrows */}
+        {(hasNext || hasPrev) && (
+          <div className="flex flex-col items-center gap-2">
+            <button
+              onClick={() => { if (hasPrev && onPrev) { setSlideDir('down'); setTimeout(() => { onPrev(); setSlideDir(null) }, 300) } }}
+              disabled={!hasPrev}
+              className={cn(
+                "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+                hasPrev ? "bg-white/10 hover:bg-white/20 text-white" : "bg-white/5 text-white/20 pointer-events-none"
+              )}
+            >
+              <ChevronUp size={20} />
+            </button>
+            <span className="type-pre-text text-white/40 tabular-nums">{partNumber}/{totalParts}</span>
+            <button
+              onClick={() => { if (hasNext && onNext) { setSlideDir('up'); setTimeout(() => { onNext(); setSlideDir(null) }, 300) } }}
+              disabled={!hasNext}
+              className={cn(
+                "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+                hasNext ? "bg-white/10 hover:bg-white/20 text-white" : "bg-white/5 text-white/20 pointer-events-none"
+              )}
+            >
+              <ChevronDown size={20} />
+            </button>
+          </div>
+        )}
+
+        <div className="flex-1" />
+      </div>
+
+      </div>{/* end desktop flex row */}
     </div>
   )
 }

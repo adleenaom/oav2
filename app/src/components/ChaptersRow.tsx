@@ -10,8 +10,8 @@ interface ChaptersRowProps {
 }
 
 const sizes = {
-  small: { w: 'w-[80px]', h: 'h-[107px]' },
-  medium: { w: 'w-[100px]', h: 'h-[133px]' },
+  small: { w: 'w-[80px]', h: 'h-[120px]' },
+  medium: { w: 'w-[100px]', h: 'h-[150px]' },
 };
 
 export default function ChaptersRow({ bundleId, size = 'small' }: ChaptersRowProps) {

@@ -5,12 +5,13 @@ import PurchaseModal from '../components/PurchaseModal';
 import Breadcrumb from '../components/Breadcrumb';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useBundleDetail } from '../hooks/useOAData';
+import { useBundleDetail, usePlan } from '../hooks/useOAData';
 import { useProgress } from '../hooks/useProgress';
 import { useCredits } from '../hooks/useCredits';
 import { useState, useEffect } from 'react';
 import CoinIcon from '../components/CoinIcon';
 import { BundleDetailSkeleton } from '../components/Skeleton';
+import ShareModal from '../components/ShareModal';
 import { fromSlug, toSlug, playUrl, lessonUrl } from '../utils/slug';
 
 type Tab = 'about' | 'chapters';
@@ -22,6 +23,7 @@ export default function BundleDetail() {
   const { getBundleProgress, getBundlePercentage } = useProgress();
   const { credits, isBundleAccessible } = useCredits();
   const { bundle: oaBundle, seriesList, resolvedChapters, resources, reviews, isLoading } = useBundleDetail(id ? Number(id) : null);
+  const { data: parentPlan } = usePlan(oaBundle?.plan?.id || null);
 
   const bundle = oaBundle ? {
     id: oaBundle.id,
@@ -42,11 +44,14 @@ export default function BundleDetail() {
   const progress = getBundleProgress(id || '');
   const percentage = getBundlePercentage(id || '');
   const completedChapters = progress?.completedChapters || [];
-  const parentLesson = bundle?.planId ? { id: bundle.planId } : null;
+  // Only show parent lesson link if the plan is a real lesson plan (isLesson=true)
+  const parentLesson = bundle?.planId && parentPlan?.isLesson ? { id: bundle.planId } : null;
 
   const [activeTab, setActiveTab] = useState<Tab>('chapters');
   const [purchaseError] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [liked, setLiked] = useState(false);
 
   // Correct URL to include slug if only ID was provided
   useEffect(() => {
@@ -83,6 +88,11 @@ export default function BundleDetail() {
   const handleCTA = () => {
     if (!hasAccess) {
       setShowPurchaseModal(true);
+      return;
+    }
+    if (bundle.chapters.length === 0) {
+      // Chapters haven't loaded yet — navigate to player directly
+      navigate(playUrl(bundle.id, 0, bundle.title));
       return;
     }
     const first = bundle.chapters.find(c => !completedChapters.includes(String(c.id)));
@@ -402,7 +412,7 @@ export default function BundleDetail() {
           <div className="container-content relative z-10 flex flex-col justify-end min-h-[300px] pt-6 pb-8">
             <Breadcrumb items={[
               { label: 'Home', path: '/' },
-              ...(bundle.planId ? [{ label: 'Lesson', path: `/lesson/${bundle.planId}` }] : []),
+              ...(parentLesson ? [{ label: parentPlan?.title ? (parentPlan.title.length > 30 ? parentPlan.title.substring(0, 30) + '…' : parentPlan.title) : 'Lesson', path: lessonUrl(parentLesson.id, parentPlan?.title) }] : []),
               { label: bundle.title },
             ]} />
 
@@ -427,10 +437,22 @@ export default function BundleDetail() {
               <OAButton variant={hasAccess ? 'blue' : 'primary'} size="medium" onClick={handleCTA}>
                 {ctaLabel}
               </OAButton>
-              <button className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors">
-                <Heart size={18} className="text-white" />
+              <button
+                onClick={() => setLiked(!liked)}
+                className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors"
+              >
+                <Heart size={18} className={liked ? 'text-accent-magenta fill-accent-magenta' : 'text-white'} />
               </button>
-              <button className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors">
+              <button
+                onClick={async () => {
+                  const url = window.location.href;
+                  if (navigator.share) {
+                    try { await navigator.share({ title: bundle.title, url }); return; } catch {}
+                  }
+                  setShowShareModal(true);
+                }}
+                className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors"
+              >
                 <Share2 size={18} className="text-white" />
               </button>
               {!hasAccess && (
@@ -485,7 +507,7 @@ export default function BundleDetail() {
                       </span>
 
                       {/* Thumbnail */}
-                      <div className="w-[80px] h-[107px] rounded-[8px] overflow-hidden bg-bg-secondary shrink-0">
+                      <div className="w-[80px] h-[120px] rounded-[8px] overflow-hidden bg-bg-secondary shrink-0">
                         <img src={chapter.seriesImage || bundle.thumbnail} alt="" className="w-full h-full object-cover" />
                       </div>
 
@@ -650,6 +672,13 @@ export default function BundleDetail() {
         }}
         isOpen={showPurchaseModal}
         onClose={() => setShowPurchaseModal(false)}
+      />
+
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        title={bundle.title}
+        url={window.location.href}
       />
     </div>
   );

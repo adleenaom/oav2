@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SearchHeader from '../components/SearchHeader';
 import SectionHeader from '../components/SectionHeader';
@@ -6,23 +6,60 @@ import BundleThumbnail from '../components/BundleThumbnail';
 import ForYouCard from '../components/ForYouCard';
 import LessonCard from '../components/LessonCard';
 import PurchaseModal from '../components/PurchaseModal';
+import ViewAllBundlesCard from '../components/ViewAllBundlesCard';
 import { HomepageSkeleton } from '../components/Skeleton';
-import { useHomepage } from '../hooks/useHomepage';
+import { useHomepage, type DiscoverBundle } from '../hooks/useHomepage';
 import { useProgress } from '../hooks/useProgress';
-import { useBundleNavigation } from '../hooks/useBundleNavigation';
+import { useCredits } from '../hooks/useCredits';
 import { lessonUrl, bundleUrl, playUrl } from '../utils/slug';
+import type { ApiBundleSummary } from '../services/types';
+
+/** Convert a DiscoverBundle to the ApiBundleSummary shape for PurchaseModal */
+function toBundleSummary(db: DiscoverBundle): ApiBundleSummary {
+  return {
+    id: db.bundleId,
+    plan_id: null,
+    title: db.bundleTitle,
+    subtitle: '',
+    description: db.bundleDescription,
+    category: '',
+    credits_required: db.creditsRequired,
+    duration_minutes: db.durationMinutes,
+    is_free: db.creditsRequired === 0,
+    thumbnail: db.allSeries[0]?.image || '',
+    chapter_count: db.chapterCount,
+    creator: db.creator ? { id: db.creator.id, name: db.creator.name, avatar: db.creator.avatar, job_title: db.creator.jobTitle, bio: db.creator.bio } : null,
+  };
+}
 
 export default function LearnHome() {
   const navigate = useNavigate();
   const { forYou, plans, discoverBundles, isLoading } = useHomepage();
   const { getPercentage, getContinueWatching, removeFromContinueWatching } = useProgress();
-  const { modalBundle, closeModal } = useBundleNavigation();
+  const { isBundleAccessible } = useCredits();
+  const [modalBundle, setModalBundle] = useState<ApiBundleSummary | null>(null);
 
   const continueRef = useRef<HTMLDivElement>(null);
   const forYouRef = useRef<HTMLDivElement>(null);
   const lessonsRef = useRef<HTMLDivElement>(null);
 
   const continueWatching = getContinueWatching();
+
+  // Sort bundles by most recent (highest ID first), take first 6 for display + next 3 for "View All" card
+  const sortedBundles = useMemo(() => {
+    return [...discoverBundles].sort((a, b) => b.bundleId - a.bundleId);
+  }, [discoverBundles]);
+  const displayBundles = sortedBundles.slice(0, 6);
+  const viewAllThumbnails = sortedBundles.slice(6, 9).map(db => db.allSeries[0]?.image || '').filter(Boolean);
+
+  const handleBundleClick = (db: DiscoverBundle) => {
+    const accessible = isBundleAccessible(db.bundleId, db.creditsRequired === 0);
+    if (accessible) {
+      navigate(bundleUrl(db.bundleId, db.bundleTitle));
+    } else {
+      setModalBundle(toBundleSummary(db));
+    }
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -53,13 +90,14 @@ export default function LearnHome() {
           <div className="bg-bg-base section-tight">
             <div className="container-content">
               <SectionHeader title="Continue Watching" onSeeAll={() => navigate('/viewall/continue')} scrollRef={continueRef} />
-              <div ref={continueRef} className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
+              <div ref={continueRef} className="flex scroll-gap overflow-x-auto hide-scrollbar scroll-row mt-4 -mx-6 px-6 md:mx-0 md:px-0">
                 {continueWatching.map(item => {
                   const actions = [
                     { label: 'Remove', onClick: () => removeFromContinueWatching(item.id) },
+                    { label: 'Go to bundle', onClick: () => navigate(bundleUrl(Number(item.id), item.title)) },
                   ];
                   if (item.planId) {
-                    actions.push({ label: 'Go to lessons', onClick: () => navigate(lessonUrl(Number(item.planId))) });
+                    actions.push({ label: 'Go to lesson', onClick: () => navigate(lessonUrl(Number(item.planId))) });
                   }
                   return (
                     <BundleThumbnail
@@ -83,7 +121,7 @@ export default function LearnHome() {
           <div className="bg-bg-base section-tight">
             <div className="container-content">
               <SectionHeader title="For You" onSeeAll={() => navigate('/viewall/foryou')} scrollRef={forYouRef} />
-              <div ref={forYouRef} className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
+              <div ref={forYouRef} className="flex scroll-gap overflow-x-auto hide-scrollbar scroll-row mt-4 -mx-6 px-6 md:mx-0 md:px-0">
                 {forYou.map((video, index) => (
                   <ForYouCard
                     key={video.id}
@@ -113,7 +151,7 @@ export default function LearnHome() {
           <div className="bg-bg-base section-tight">
             <div className="container-content">
               <SectionHeader title="Explore Lessons" onSeeAll={() => navigate('/viewall/lessons')} scrollRef={lessonsRef} />
-              <div ref={lessonsRef} className="flex scroll-gap overflow-x-auto hide-scrollbar mt-4 -mx-6 px-6 md:mx-0 md:px-0">
+              <div ref={lessonsRef} className="flex scroll-gap overflow-x-auto hide-scrollbar scroll-row mt-4 -mx-6 px-6 md:mx-0 md:px-0">
                 {plans.map(plan => (
                   <LessonCard
                     key={plan.id}
@@ -145,26 +183,40 @@ export default function LearnHome() {
           </div>
         )}
 
-        {/* OpenAcademy Originals — one card per bundle, first series image */}
-        {discoverBundles.length > 0 && (
+        {/* OpenAcademy Originals — 6 recent bundles + desktop "View All" card */}
+        {displayBundles.length > 0 && (
           <div className="bg-bg-base section">
             <div className="container-content">
-              <h2 className="type-display-large text-text-brand section-heading-gap">
-                OpenAcademy Originals
-              </h2>
+              <SectionHeader
+                title="OpenAcademy Originals"
+                titleClassName="type-display-large text-text-brand"
+                onSeeAll={() => navigate('/discover#bundles')}
+                seeAllClassName="lg:hidden"
+              />
 
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 card-grid-gap">
-                {discoverBundles.map(db => (
-                  <BundleThumbnail
-                    key={db.bundleId}
-                    thumbnail={db.allSeries[0]?.image || ''}
-                    alt={db.bundleTitle}
-                    size="big"
-                    progress={getPercentage(String(db.bundleId)) || undefined}
-                    onClick={() => navigate(bundleUrl(db.bundleId, db.bundleTitle))}
-                    className="w-full h-auto aspect-[3/4]"
-                  />
-                ))}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 card-grid-gap mt-4">
+                {displayBundles.map(db => {
+                  const pct = getPercentage(String(db.bundleId));
+                  const accessible = isBundleAccessible(db.bundleId, db.creditsRequired === 0);
+                  return (
+                    <BundleThumbnail
+                      key={db.bundleId}
+                      thumbnail={db.allSeries[0]?.image || ''}
+                      alt={db.bundleTitle}
+                      size="big"
+                      progress={pct || undefined}
+                      price={!accessible && !pct ? (db.creditsRequired === 0 ? 'free' : db.creditsRequired) : undefined}
+                      onClick={() => handleBundleClick(db)}
+                      className="w-full h-auto aspect-[2/3]"
+                    />
+                  );
+                })}
+                {/* Desktop-only "View All Bundles" card — spans 2 columns */}
+                {viewAllThumbnails.length > 0 && (
+                  <div className="hidden lg:block lg:col-span-2">
+                    <ViewAllBundlesCard thumbnails={viewAllThumbnails} />
+                  </div>
+                )}
               </div>
 
             </div>
@@ -175,7 +227,7 @@ export default function LearnHome() {
       </div>
 
       {modalBundle && (
-        <PurchaseModal bundle={modalBundle} isOpen={true} onClose={closeModal} />
+        <PurchaseModal bundle={modalBundle} isOpen={true} onClose={() => setModalBundle(null)} />
       )}
     </div>
   );

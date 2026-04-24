@@ -51,7 +51,8 @@ export default function ChapterPlayer() {
     ? isBundleAccessible(nextPlanBundle.id, nextPlanBundle.creditsRequired === 0) : false;
 
   const chapters = resolvedChapters;
-  const [currentIdx, setCurrentIdx] = useState(parseInt(chapterIndex || '0', 10));
+  const [currentChapterIdx, setCurrentChapterIdx] = useState(parseInt(chapterIndex || '0', 10));
+  const [currentPartIdx, setCurrentPartIdx] = useState(0);
   const [playerState, setPlayerState] = useState<PlayerState>('playing');
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [countdown, setCountdown] = useState(5);
@@ -60,25 +61,42 @@ export default function ChapterPlayer() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
-  const currentChapter = chapters[currentIdx];
-  const hasNext = currentIdx < chapters.length - 1;
+  const currentChapter = chapters[currentChapterIdx];
+  const totalParts = currentChapter?.parts?.length || 1;
+  const currentPart = currentChapter?.parts?.[currentPartIdx];
+  const currentVideoUrl = currentPart?.videoUrl || currentChapter?.videoUrl || '';
+  const currentPosterImage = currentPart?.videoImage || currentChapter?.videoImage || '';
+  const hasNextChapter = currentChapterIdx < chapters.length - 1;
+  const hasNextPart = currentPartIdx < totalParts - 1;
+  const hasPrevPart = currentPartIdx > 0;
   const progress = getBundleProgress(bundleId || '');
   const isCompleted = progress?.completedChapters?.includes(String(currentChapter?.id));
 
-  // ---- Navigation with transition ----
+  // ---- Navigation ----
 
-  const goToChapter = useCallback((idx: number) => {
-    if (idx < 0 || idx >= chapters.length || isTransitioning) return;
+  // Skip to next/prev part within current chapter (instant, no buffer)
+  const goToPart = useCallback((partIdx: number) => {
+    if (partIdx < 0 || partIdx >= totalParts || isTransitioning) return;
     setIsTransitioning(true);
     setTimeout(() => {
-      setCurrentIdx(idx);
+      setCurrentPartIdx(partIdx);
+      setPlayerState('playing');
+      setIsTransitioning(false);
+    }, 300);
+  }, [totalParts, isTransitioning]);
+
+  // Go to a different chapter (with transition)
+  const goToChapter = useCallback((chapterIdx: number) => {
+    if (chapterIdx < 0 || chapterIdx >= chapters.length || isTransitioning) return;
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setCurrentChapterIdx(chapterIdx);
+      setCurrentPartIdx(0);
       setPlayerState('playing');
       setIsTransitioning(false);
       setCountdown(5);
     }, 300);
   }, [chapters.length, isTransitioning]);
-
-  // Swipe/keyboard navigation now handled by ChapterVideoPlayer internally
 
   // ---- Keyboard (desktop) ----
 
@@ -86,11 +104,13 @@ export default function ChapterPlayer() {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'ArrowUp') {
         e.preventDefault();
-        if (currentIdx > 0) goToChapter(currentIdx - 1);
+        if (hasPrevPart) goToPart(currentPartIdx - 1);
+        else if (currentChapterIdx > 0) goToChapter(currentChapterIdx - 1);
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
         if (playerState === 'playing') {
-          if (hasNext) goToChapter(currentIdx + 1);
+          if (hasNextPart) goToPart(currentPartIdx + 1);
+          else if (hasNextChapter) setPlayerState('up-next');
           else setPlayerState('end-of-bundle');
         }
       } else if (e.key === ' ') {
@@ -102,15 +122,15 @@ export default function ChapterPlayer() {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [currentIdx, playerState, hasNext, goToChapter]);
+  }, [currentChapterIdx, currentPartIdx, playerState, hasNextPart, hasNextChapter, hasPrevPart, goToPart, goToChapter]);
 
   // ---- Auto-play on chapter change + track progress ----
 
   useEffect(() => {
     if (!currentChapter || !bundle || chapters.length === 0) return;
 
-    // Reset if rewatching a completed chapter
-    if (isCompleted) {
+    // Reset if rewatching a completed chapter (only on first part)
+    if (isCompleted && currentPartIdx === 0) {
       resetChapterProgress(String(bundle.id), String(currentChapter.id));
     }
 
@@ -130,20 +150,20 @@ export default function ChapterPlayer() {
       videoRef.current.load();
       videoRef.current.play().catch(() => {});
     }
-  }, [currentIdx, bundle?.id, chapters.length]);
+  }, [currentChapterIdx, currentPartIdx, bundle?.id, chapters.length]);
 
   // ---- Video ended → show "up next" or "end of bundle" ----
 
   // After survey completes, proceed to next chapter or end-of-bundle
   const handleSurveyComplete = useCallback(() => {
-    if (hasNext) {
+    if (hasNextChapter) {
       setPlayerState('up-next');
       setCountdown(5);
       countdownRef.current = setInterval(() => {
         setCountdown(prev => {
           if (prev <= 1) {
             clearInterval(countdownRef.current);
-            goToChapter(currentIdx + 1);
+            goToChapter(currentChapterIdx + 1);
             return 5;
           }
           return prev - 1;
@@ -167,10 +187,18 @@ export default function ChapterPlayer() {
     } else {
       setPlayerState('end-of-bundle');
     }
-  }, [hasNext, currentIdx, goToChapter, nextPlanBundle, nextBundleAccessible, navigate]);
+  }, [hasNextChapter, currentChapterIdx, goToChapter, nextPlanBundle, nextBundleAccessible, navigate]);
 
   const handleVideoEnded = useCallback(() => {
     if (!currentChapter || !bundle) return;
+
+    // If there are more parts in this chapter, go to next part instantly
+    if (hasNextPart) {
+      goToPart(currentPartIdx + 1);
+      return;
+    }
+
+    // Last part of chapter — mark chapter complete
     markChapterComplete(String(bundle.id), String(currentChapter.id));
 
     // Show survey if chapter has assessments
@@ -179,17 +207,15 @@ export default function ChapterPlayer() {
       return;
     }
 
-    if (hasNext) {
-      // Check if next chapter is in a different bundle (lesson plan flow)
+    // Proceed to next chapter with 5s buffer
+    if (hasNextChapter) {
       setPlayerState('up-next');
       setCountdown(5);
-
-      // Start countdown
       countdownRef.current = setInterval(() => {
         setCountdown(prev => {
           if (prev <= 1) {
             clearInterval(countdownRef.current);
-            goToChapter(currentIdx + 1);
+            goToChapter(currentChapterIdx + 1);
             return 5;
           }
           return prev - 1;
@@ -216,7 +242,7 @@ export default function ChapterPlayer() {
         setPlayerState('end-of-bundle');
       }
     }
-  }, [currentChapter, bundle, hasNext, currentIdx, markChapterComplete, goToChapter, nextPlanBundle, nextBundleAccessible, navigate]);
+  }, [currentChapter, bundle, hasNextPart, hasNextChapter, currentPartIdx, currentChapterIdx, markChapterComplete, goToPart, goToChapter, nextPlanBundle, nextBundleAccessible, navigate]);
 
   // Cleanup countdown on unmount
   useEffect(() => () => clearInterval(countdownRef.current), []);
@@ -253,7 +279,7 @@ export default function ChapterPlayer() {
         {playerState === 'survey' && currentChapter.assessments.length > 0 && (
           <SurveyScreen
             bundleTitle={bundle.title}
-            partNumber={currentIdx + 1}
+            partNumber={currentChapterIdx + 1}
             totalParts={chapters.length}
             assessments={currentChapter.assessments}
             onClose={() => navigate(-1)}
@@ -264,33 +290,40 @@ export default function ChapterPlayer() {
         {/* ChapterVideoPlayer replaces raw <video> */}
         {playerState === 'playing' && (
           <ChapterVideoPlayer
-            videoUrl={currentChapter.videoUrl}
-            posterImage={currentChapter.videoImage}
+            videoUrl={currentVideoUrl}
+            posterImage={currentPosterImage}
             bundleTitle={bundle.title}
             chapterTitle={currentChapter.title}
-            partNumber={currentIdx + 1}
-            totalParts={chapters.length}
+            partNumber={currentPartIdx + 1}
+            totalParts={totalParts}
             duration={currentChapter.duration}
             skipTimestamp={5}
-            hasNext={hasNext}
-            hasPrev={currentIdx > 0}
-            onNext={() => goToChapter(currentIdx + 1)}
-            onPrev={() => goToChapter(currentIdx - 1)}
+            hasNext={hasNextPart || hasNextChapter}
+            hasPrev={hasPrevPart || currentChapterIdx > 0}
+            onNext={() => {
+              if (hasNextPart) goToPart(currentPartIdx + 1);
+              else if (hasNextChapter) goToChapter(currentChapterIdx + 1);
+            }}
+            onPrev={() => {
+              if (hasPrevPart) goToPart(currentPartIdx - 1);
+              else if (currentChapterIdx > 0) goToChapter(currentChapterIdx - 1);
+            }}
             onClose={() => navigate(-1)}
             onEnded={handleVideoEnded}
+            onTitleClick={() => navigate(bundleUrl(Number(bundleId), bundle.title))}
           />
         )}
 
         {/* Up Next screen */}
-        {playerState === 'up-next' && hasNext && (
+        {playerState === 'up-next' && hasNextChapter && (
           <div className="absolute inset-0 flex flex-col items-center justify-center px-6 gap-6">
             <p className="type-tags text-white/50">UP NEXT</p>
-            <p className="type-headline-large text-white text-center">{chapters[currentIdx + 1].title}</p>
-            <p className="type-description text-white/40">{chapters[currentIdx + 1].duration}</p>
+            <p className="type-headline-large text-white text-center">{chapters[currentChapterIdx + 1].title}</p>
+            <p className="type-description text-white/40">{chapters[currentChapterIdx + 1].duration}</p>
 
             {/* Countdown play button */}
             <button
-              onClick={() => { clearInterval(countdownRef.current); goToChapter(currentIdx + 1); }}
+              onClick={() => { clearInterval(countdownRef.current); goToChapter(currentChapterIdx + 1); }}
               className="relative w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mt-4"
             >
               <svg className="absolute inset-0 w-20 h-20 -rotate-90" viewBox="0 0 80 80">

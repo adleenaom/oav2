@@ -269,6 +269,10 @@ export async function getHomepageData() {
     seriesIds.length > 0 ? getSeries(seriesIds).catch(() => [] as OASeries[]) : Promise.resolve([] as OASeries[]),
   ]);
 
+  // Sort all by highest ID first (most recently uploaded)
+  forYouVideos.sort((a, b) => b.id - a.id);
+  plans.sort((a, b) => b.id - a.id);
+
   return {
     forYou: forYouVideos,
     plans,
@@ -276,21 +280,35 @@ export async function getHomepageData() {
   };
 }
 
-/** Resolve discover bundles separately */
-export async function resolveDiscoverBundles(series: OASeries[]) {
-  const bundleIds = [...new Set(series.filter(s => s.bundle).map(s => s.bundle!.id))];
-  if (bundleIds.length === 0) return [];
+/** Resolve discover bundles from the full bundle catalog (not limited series listings) */
+export async function resolveDiscoverBundles() {
+  // Fetch all bundle IDs from search endpoint
+  const searchRes = await apiPost<{ items: { id: number }[] }>('/v3/bundles/search', { query: '', size: 100, index: 0 });
+  const allIds = (searchRes.items || []).map(i => i.id).sort((a, b) => b - a); // most recent first
+  if (allIds.length === 0) return [];
 
-  const bundles = await getBundles(bundleIds);
-  const allSeriesIds = [...new Set(bundles.flatMap(b => (b.series || []).map(s => s.id)))];
-  const allSeries = allSeriesIds.length > 0 ? await getSeries(allSeriesIds) : [];
+  const bundles = await getBundles(allIds);
+  // Reorder to match sorted IDs (API retrieve doesn't preserve order)
+  const orderedBundles = allIds.map(id => bundles.find(b => b.id === id)).filter(Boolean) as OABundle[];
 
-  const result: { bundleId: number; bundleTitle: string; bundleDescription: string; creditsRequired: number; durationMinutes: number; chapterCount: number; allSeries: OASeries[] }[] = [];
-  for (const b of bundles) {
+  // Resolve first series for each bundle (for thumbnails)
+  const firstSeriesIds = [...new Set(orderedBundles.map(b => b.series?.[0]?.id).filter(Boolean) as number[])];
+  const allSeries = firstSeriesIds.length > 0 ? await getSeries(firstSeriesIds) : [];
+
+  // Resolve creators from series
+  const creatorIds = [...new Set(allSeries.map(s => s.creator?.id).filter(Boolean) as number[])];
+  const allCreators = creatorIds.length > 0 ? await getCreators(creatorIds) : [];
+  const creatorMap = new Map(allCreators.map(c => [c.id, c]));
+
+  const result: { bundleId: number; bundleTitle: string; bundleDescription: string; creditsRequired: number; durationMinutes: number; chapterCount: number; allSeries: OASeries[]; creator: OACreator | null }[] = [];
+  for (const b of orderedBundles) {
     const bSeriesIds = (b.series || []).map(s => s.id);
     const bSeries = bSeriesIds
       .map(id => allSeries.find(s => s.id === id))
       .filter(Boolean) as OASeries[];
+    // Get creator from first series that has one
+    const creatorRef = bSeries.find(s => s.creator)?.creator;
+    const creator = creatorRef ? creatorMap.get(creatorRef.id) || null : null;
     result.push({
       bundleId: b.id,
       bundleTitle: b.title,
@@ -299,6 +317,7 @@ export async function resolveDiscoverBundles(series: OASeries[]) {
       durationMinutes: b.durationMinutes,
       chapterCount: bSeries.length,
       allSeries: bSeries,
+      creator,
     });
   }
   return result;

@@ -91,6 +91,48 @@ function proxyRequest(req, res, upstreamPath) {
   });
 }
 
+/** Resolve a /media/ redirect and return the CDN URL as plain text */
+function resolveMediaRedirect(req, res, upstreamPath) {
+  const forwardHeaders = { ...req.headers };
+  delete forwardHeaders['host'];
+  delete forwardHeaders['connection'];
+  delete forwardHeaders['transfer-encoding'];
+  delete forwardHeaders['accept-encoding'];
+
+  for (const key of Object.keys(forwardHeaders)) {
+    if (key.startsWith('x-forwarded') || key.startsWith('x-real') || key.startsWith('cf-') || key === 'true-client-ip') {
+      delete forwardHeaders[key];
+    }
+  }
+
+  const options = {
+    hostname: UPSTREAM_HOST,
+    port: 443,
+    path: upstreamPath,
+    method: 'GET',
+    headers: { ...forwardHeaders, host: UPSTREAM_HOST },
+  };
+
+  const proxyReq = https.request(options, (proxyRes) => {
+    if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
+      res.writeHead(200, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
+      res.end(proxyRes.headers.location);
+    } else {
+      // Not a redirect — pass through
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res);
+    }
+  });
+
+  proxyReq.on('error', (err) => {
+    console.error('Resolve media error:', err.message);
+    res.writeHead(502, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Bad Gateway', message: err.message }));
+  });
+
+  proxyReq.end();
+}
+
 function serveStatic(req, res) {
   const parsedUrl = url.parse(req.url);
   let filePath = path.join(STATIC_DIR, parsedUrl.pathname);
@@ -126,6 +168,13 @@ function serveStatic(req, res) {
 
 const server = http.createServer((req, res) => {
   const pathname = url.parse(req.url).pathname;
+
+  // Resolve media redirect → return CDN URL as plain text (for video player)
+  if (pathname.startsWith('/resolve-media/')) {
+    const upstreamPath = '/media/' + pathname.slice('/resolve-media/'.length);
+    resolveMediaRedirect(req, res, upstreamPath);
+    return;
+  }
 
   // Check proxy routes
   for (const [prefix, upstreamPrefix] of Object.entries(PROXY_ROUTES)) {

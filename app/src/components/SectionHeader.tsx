@@ -6,9 +6,13 @@ interface SectionHeaderProps {
   onSeeAll?: () => void;
   /** Pass the scrollable container ref to enable carousel controls on desktop */
   scrollRef?: React.RefObject<HTMLDivElement | null>;
+  /** Custom class for the title text */
+  titleClassName?: string;
+  /** Custom class for the see-all button (e.g. to hide on certain breakpoints) */
+  seeAllClassName?: string;
 }
 
-export default function SectionHeader({ title, onSeeAll, scrollRef }: SectionHeaderProps) {
+export default function SectionHeader({ title, onSeeAll, scrollRef, titleClassName, seeAllClassName }: SectionHeaderProps) {
   const [showControls, setShowControls] = useState(false);
 
   // Check if content overflows (needs scrolling)
@@ -34,12 +38,12 @@ export default function SectionHeader({ title, onSeeAll, scrollRef }: SectionHea
     <div className="flex items-center justify-between w-full">
       {/* Title + see-all arrow together — both clickable */}
       {onSeeAll ? (
-        <button onClick={onSeeAll} className="flex items-center gap-1.5 hover:underline transition-colors">
-          <h2 className="type-headline-large text-text-primary">{title}</h2>
+        <button onClick={onSeeAll} className={`flex items-center gap-1.5 hover:underline transition-colors ${seeAllClassName || ''}`}>
+          <h2 className={titleClassName || 'type-headline-large text-text-primary'}>{title}</h2>
           <ChevronRight size={20} className="text-text-primary" strokeWidth={2.5} />
         </button>
       ) : (
-        <h2 className="type-headline-large text-text-primary">{title}</h2>
+        <h2 className={titleClassName || 'type-headline-large text-text-primary'}>{title}</h2>
       )}
 
       {/* Carousel controls — desktop only, hidden when content fits */}

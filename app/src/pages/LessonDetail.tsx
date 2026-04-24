@@ -4,6 +4,7 @@ import { ChevronLeft, Star, Heart, Search, BookOpen, Clock, Award, Video, HelpCi
 import OAButton from '../components/OAButton';
 import ChaptersRow from '../components/ChaptersRow';
 import Breadcrumb from '../components/Breadcrumb';
+import PurchaseModal from '../components/PurchaseModal';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { usePlanDetail } from '../hooks/useOAData';
@@ -20,9 +21,10 @@ export default function LessonDetail() {
   const { slug } = useParams<{ slug: string }>();
   const id = slug ? String(fromSlug(slug)) : null;
   const navigate = useNavigate();
-  const { getPercentage } = useProgress();
-  const { credits } = useCredits();
+  const { getPercentage, getBundlePercentage } = useProgress();
+  const { credits, isBundleAccessible } = useCredits();
   const [activeTab, setActiveTab] = useState<Tab>('About');
+  const [modalBundle, setModalBundle] = useState<any>(null);
   const { plan: oaPlan, planBundles, isLoading } = usePlanDetail(id ? Number(id) : null);
 
   // Parse structured info field: [{type:"heading",content:""}, {type:"list1",content:""}, ...]
@@ -63,9 +65,9 @@ export default function LessonDetail() {
     })),
   } : null;
 
-  // Redirect home if plan not found
+  // Redirect home if plan not found or if it's not a real lesson plan
   useEffect(() => {
-    if (!isLoading && !oaPlan) navigate('/');
+    if (!isLoading && (!oaPlan || !oaPlan.isLesson)) navigate('/', { replace: true });
   }, [isLoading, oaPlan, navigate]);
 
   // Correct URL to include slug if only ID was provided
@@ -289,14 +291,31 @@ export default function LessonDetail() {
                   <ChaptersRow bundleId={bundle.id} size="small" />
 
                   {/* CTA */}
-                  <OAButton
-                    variant="blue"
-                    size="medium"
-                    fullWidth
-                    onClick={() => navigate(bundle.isFree ? playUrl(bundle.id, 0, bundle.title) : bundleUrl(bundle.id, bundle.title))}
-                  >
-                    {bundle.isFree ? 'Start Bundle' : <span className="flex items-center justify-center gap-1">Get this bundle | <CoinIcon size={14} /> {bundle.price}</span>}
-                  </OAButton>
+                  {(() => {
+                    const accessible = isBundleAccessible(bundle.id, bundle.isFree);
+                    const pct = getBundlePercentage(String(bundle.id));
+                    if (accessible) {
+                      return (
+                        <OAButton variant="blue" size="medium" fullWidth
+                          onClick={() => navigate(playUrl(bundle.id, 0, bundle.title))}
+                        >
+                          {pct > 0 ? 'Resume Learning' : 'Start Bundle'}
+                        </OAButton>
+                      );
+                    }
+                    return (
+                      <OAButton variant="blue" size="medium" fullWidth
+                        onClick={() => setModalBundle({
+                          id: bundle.id, plan_id: null, title: bundle.title, subtitle: bundle.subtitle,
+                          description: bundle.description, category: bundle.category,
+                          credits_required: bundle.price, duration_minutes: bundle.totalMinutes,
+                          is_free: false, thumbnail: '', chapter_count: bundle.chapterCount, creator: null,
+                        })}
+                      >
+                        <span className="flex items-center justify-center gap-1">Get this bundle | <CoinIcon size={14} /> {bundle.price}</span>
+                      </OAButton>
+                    );
+                  })()}
 
                   <div className="h-px bg-border-default mt-2" />
                 </div>
@@ -482,14 +501,31 @@ export default function LessonDetail() {
                     <ChaptersRow bundleId={bundle.id} size="small" />
 
                     {/* CTA button */}
-                    <OAButton
-                      variant="blue"
-                      size="medium"
-                      fullWidth
-                      onClick={() => navigate(bundleUrl(bundle.id, bundle.title))}
-                    >
-                      {bundle.isFree ? 'Start Bundle' : <span className="flex items-center justify-center gap-1">Get this bundle | <CoinIcon size={14} /> {bundle.price}</span>}
-                    </OAButton>
+                    {(() => {
+                      const accessible = isBundleAccessible(bundle.id, bundle.isFree);
+                      const pct = getBundlePercentage(String(bundle.id));
+                      if (accessible) {
+                        return (
+                          <OAButton variant="blue" size="medium" fullWidth
+                            onClick={() => navigate(playUrl(bundle.id, 0, bundle.title))}
+                          >
+                            {pct > 0 ? 'Resume Learning' : 'Start Bundle'}
+                          </OAButton>
+                        );
+                      }
+                      return (
+                        <OAButton variant="blue" size="medium" fullWidth
+                          onClick={() => setModalBundle({
+                            id: bundle.id, plan_id: null, title: bundle.title, subtitle: bundle.subtitle,
+                            description: bundle.description, category: bundle.category,
+                            credits_required: bundle.price, duration_minutes: bundle.totalMinutes,
+                            is_free: false, thumbnail: '', chapter_count: bundle.chapterCount, creator: null,
+                          })}
+                        >
+                          <span className="flex items-center justify-center gap-1">Get this bundle | <CoinIcon size={14} /> {bundle.price}</span>
+                        </OAButton>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}
@@ -579,6 +615,15 @@ export default function LessonDetail() {
           </div>
         </div>
       </div>
+
+      {/* Purchase modal */}
+      {modalBundle && (
+        <PurchaseModal
+          bundle={modalBundle}
+          isOpen={true}
+          onClose={() => setModalBundle(null)}
+        />
+      )}
     </div>
   );
 }

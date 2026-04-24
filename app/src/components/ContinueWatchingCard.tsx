@@ -11,7 +11,7 @@ export default function ContinueWatchingCard({ content, percentage, onClick }: C
   return (
     <button
       onClick={onClick}
-      className="card-interactive relative w-[154px] h-[234px] md:w-[200px] md:h-[300px] rounded-[9px] overflow-hidden shrink-0"
+      className="card-interactive relative w-[154px] h-[231px] md:w-[200px] md:h-[300px] rounded-[9px] overflow-hidden shrink-0"
     >
       <img src={content.thumbnail} alt={content.title} className="absolute inset-0 w-full h-full object-cover" />
       <div className="absolute inset-0 bg-black/30" />
